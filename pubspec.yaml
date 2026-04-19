@@ -34,6 +34,13 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.6
 
+  # Backend & Auth
+  supabase_flutter: ^2.5.0
+  google_sign_in: ^6.2.1
+
+  # URL launching (for retailer deep links)
+  url_launcher: ^6.2.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

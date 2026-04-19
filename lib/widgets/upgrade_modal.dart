@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../theme.dart';
+import '../utils/pricing.dart';
 
 /// Call this from anywhere to show the Pro upgrade sheet.
 /// [source] controls the contextual message shown:
@@ -19,6 +20,9 @@ class UpgradeModal extends StatelessWidget {
   final String source;
   const UpgradeModal({super.key, required this.source});
 
+  // Detect local pricing once per modal build
+  PricingInfo get _pricing => getLocalPricing();
+
   String get _contextMessage {
     switch (source) {
       case 'scan_limit':
@@ -27,6 +31,10 @@ class UpgradeModal extends StatelessWidget {
         return "The Weekly Progress Report is a Pro feature. Unlock your full 7-day analysis with trends and AI insights.";
       case 'budget_coach':
         return "The AI Budget Coach is a Pro feature. Get real-time advice on what to eat with your remaining calories.";
+      case 'generate_plan':
+        return "AI Meal Plan Generation is a Pro feature. Get personalised meal plans tailored to your calorie goal, budget, and dietary preferences.";
+      case 'fridge_scan':
+        return "Fridge Scanner is a Pro feature. Snap a photo of your fridge and AI will identify your ingredients and suggest meal plans.";
       default:
         return "Upgrade to Pro to remove all limits and unlock the complete CalorieLens experience.";
     }
@@ -99,22 +107,32 @@ class UpgradeModal extends StatelessWidget {
           // Feature list
           ..._features.map((f) => _FeatureRow(text: f)),
           const SizedBox(height: 20),
-          // Price
-          const Column(
+          // Price — locale-aware
+          Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('£4.99', style: TextStyle(color: CLColors.text, fontSize: 32, fontWeight: FontWeight.w700)),
-                  Padding(
+                  Text(
+                    _pricing.fullPrice.replaceAll('/month', ''),
+                    style: const TextStyle(
+                      color: CLColors.text,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Padding(
                     padding: EdgeInsets.only(bottom: 6, left: 4),
-                    child: Text('/month', style: TextStyle(color: CLColors.muted, fontSize: 14)),
+                    child: Text('/month',
+                        style: TextStyle(color: CLColors.muted, fontSize: 14)),
                   ),
                 ],
               ),
-              Text('Cancel anytime · 7-day free trial included',
-                  style: TextStyle(color: CLColors.muted, fontSize: 11)),
+              Text(
+                '${_pricing.currency} · Cancel anytime · 7-day free trial',
+                style: const TextStyle(color: CLColors.muted, fontSize: 11),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -155,10 +173,11 @@ class UpgradeModal extends StatelessWidget {
 
   static const _features = [
     'Unlimited meal scans — no daily cap',
+    'AI-generated personalised meal plans',
+    'Fridge Scanner — snap & get recipe ideas',
     'AI Budget Coach — "What can I eat right now?"',
     'Weekly Progress Report — full 7-day analysis',
     'Unlimited AI Coach with full history',
-    'Priority AI responses',
   ];
 }
 

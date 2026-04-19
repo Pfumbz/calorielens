@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/models.dart';
 import '../theme.dart';
+import 'history_screen.dart';
 
 class TodayScreen extends StatelessWidget {
   const TodayScreen({super.key});
@@ -26,7 +27,25 @@ class TodayScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _buildWaterTracker(context, state),
               const SizedBox(height: 20),
-              const Text('Today\'s Meals', style: TextStyle(color: CLColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Today\'s Meals', style: TextStyle(color: CLColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('History', style: TextStyle(color: CLColors.accent.withOpacity(0.8), fontSize: 12)),
+                        const SizedBox(width: 3),
+                        Icon(Icons.chevron_right, color: CLColors.accent.withOpacity(0.8), size: 16),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 10),
               if (state.diary.isEmpty) _buildEmptyState(context) else _buildDiaryList(context, state),
               const SizedBox(height: 80),

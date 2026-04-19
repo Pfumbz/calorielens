@@ -4,7 +4,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/models.dart';
-import '../services/anthropic_service.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
 import '../widgets/upgrade_modal.dart';
@@ -71,11 +70,6 @@ class _ScanScreenState extends State<ScanScreen>
 
   Future<void> _analyse() async {
     final state = context.read<AppState>();
-    if (!state.hasApiKey) {
-      setState(() =>
-          _error = 'Add your Anthropic API key in Settings first.');
-      return;
-    }
     if (!state.canScan && !state.isPremium) {
       showUpgradeModal(context, source: 'scan_limit');
       return;
@@ -88,7 +82,7 @@ class _ScanScreenState extends State<ScanScreen>
     });
 
     try {
-      final svc = AnthropicService(state.apiKey);
+      final svc = state.backend;
       ScanResult res;
       if (_textMode) {
         final desc = _textCtrl.text.trim();
@@ -257,7 +251,7 @@ class _ScanScreenState extends State<ScanScreen>
                   color: CLColors.surface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: state.hasApiKey
+                    color: (state.isSignedIn || state.hasApiKey)
                         ? CLColors.green.withOpacity(0.4)
                         : CLColors.border,
                   ),
@@ -268,19 +262,24 @@ class _ScanScreenState extends State<ScanScreen>
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: state.hasApiKey
+                        color: (state.isSignedIn || state.hasApiKey)
                             ? CLColors.green
-                            : CLColors.red,
+                            : CLColors.gold,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text('Settings',
-                        style: TextStyle(
-                            color: state.hasApiKey
-                                ? CLColors.text
-                                : CLColors.muted,
-                            fontSize: 11)),
+                    Text(
+                      state.isSignedIn
+                          ? '${state.scansRemainingToday} left'
+                          : state.hasApiKey
+                              ? 'BYOK'
+                              : 'Guest',
+                      style: TextStyle(
+                          color: (state.isSignedIn || state.hasApiKey)
+                              ? CLColors.text
+                              : CLColors.muted,
+                          fontSize: 11)),
                   ],
                 ),
               ),

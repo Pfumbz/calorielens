@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/models.dart';
-import '../services/anthropic_service.dart';
 import '../theme.dart';
 
 class CoachScreen extends StatefulWidget {
@@ -57,17 +56,6 @@ Be concise, warm, and practical. Use specific numbers from their data. Keep resp
   Future<void> _send(String text) async {
     if (text.trim().isEmpty) return;
     final state = context.read<AppState>();
-    if (!state.hasApiKey) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Add your Anthropic API key in Settings to use the AI coach.'),
-          backgroundColor: CLColors.accentDim,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
     _msgCtrl.clear();
     setState(() {
       _messages.add(ChatMessage(role: 'user', content: text, timestamp: DateTime.now()));
@@ -76,7 +64,7 @@ Be concise, warm, and practical. Use specific numbers from their data. Keep resp
     _scrollToBottom();
 
     try {
-      final svc = AnthropicService(state.apiKey);
+      final svc = state.backend;
       final reply = await svc.chat(
         history: _messages.sublist(0, _messages.length - 1),
         userMessage: text,

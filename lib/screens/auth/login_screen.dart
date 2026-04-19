@@ -1,0 +1,396 @@
+import 'package:flutter/material.dart';
+import '../../services/auth_service.dart';
+import '../../theme.dart';
+
+/// Full-screen login / sign-up screen.
+/// Shows after splash if the user is not signed in.
+/// "Continue as Guest" lets them use the app without an account
+/// (limited to 3 scans/day via local count, no cloud sync).
+class LoginScreen extends StatefulWidget {
+  /// Called when the user taps "Continue as Guest".
+  /// If null (e.g. when opened from Settings), the button is hidden.
+  final VoidCallback? onContinueAsGuest;
+
+  const LoginScreen({super.key, this.onContinueAsGuest});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  bool _isSignUp = false;
+  bool _loading = false;
+  bool _pwVisible = false;
+  String? _errorMsg;
+  String? _infoMsg;
+
+  final _emailCtrl = TextEditingController();
+  final _pwCtrl = TextEditingController();
+
+  late AnimationController _animCtrl;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _animCtrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    _emailCtrl.dispose();
+    _pwCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────
+  Future<void> _submit() async {
+    final email = _emailCtrl.text.trim();
+    final pw = _pwCtrl.text;
+
+    if (email.isEmpty || pw.isEmpty) {
+      setState(() => _errorMsg = 'Please enter your email and password.');
+      return;
+    }
+
+    setState(() { _loading = true; _errorMsg = null; _infoMsg = null; });
+
+    final result = _isSignUp
+        ? await AuthService.signUpWithEmail(email, pw)
+        : await AuthService.signInWithEmail(email, pw);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (result.success) {
+      if (result.user == null) {
+        // Email confirmation sent
+        setState(() => _infoMsg = result.error);
+      }
+      // If user is non-null, main.dart's StreamBuilder will navigate automatically
+    } else {
+      setState(() => _errorMsg = result.error);
+    }
+  }
+
+  Future<void> _googleSignIn() async {
+    setState(() { _loading = true; _errorMsg = null; _infoMsg = null; });
+    final result = await AuthService.signInWithGoogle();
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (!result.success) {
+      setState(() => _errorMsg = result.error);
+    }
+    // On success main.dart handles the navigation
+  }
+
+  void _continueAsGuest() {
+    widget.onContinueAsGuest?.call();
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: CLColors.bg,
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 32),
+                _buildLogo(),
+                const SizedBox(height: 36),
+                _buildHeadline(),
+                const SizedBox(height: 28),
+                _buildEmailField(),
+                const SizedBox(height: 14),
+                _buildPasswordField(),
+                const SizedBox(height: 6),
+                if (!_isSignUp) _buildForgotPassword(),
+                const SizedBox(height: 22),
+                if (_errorMsg != null) _buildMessage(_errorMsg!, isError: true),
+                if (_infoMsg != null) _buildMessage(_infoMsg!, isError: false),
+                if (_errorMsg != null || _infoMsg != null) const SizedBox(height: 14),
+                _buildSubmitButton(),
+                const SizedBox(height: 16),
+                _buildDivider(),
+                const SizedBox(height: 16),
+                _buildGoogleButton(),
+                const SizedBox(height: 28),
+                _buildToggleRow(),
+                const SizedBox(height: 36),
+                _buildGuestOption(),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE07B39), Color(0xFF8B4513)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: CLColors.accent.withOpacity(0.4),
+                blurRadius: 14,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: const Icon(Icons.camera_alt, color: Colors.white, size: 22),
+        ),
+        const SizedBox(width: 12),
+        RichText(
+          text: const TextSpan(
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: CLColors.text),
+            children: [
+              TextSpan(text: 'Calorie'),
+              TextSpan(
+                text: 'Lens',
+                style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeadline() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _isSignUp ? 'Create your account' : 'Welcome back',
+          style: const TextStyle(
+            color: CLColors.text,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _isSignUp
+              ? 'Sign up for free — 10 AI scans/day included'
+              : 'Sign in to sync your meals and unlock AI features',
+          style: const TextStyle(color: CLColors.muted, fontSize: 13, height: 1.4),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmailField() {
+    return TextField(
+      controller: _emailCtrl,
+      keyboardType: TextInputType.emailAddress,
+      autofillHints: const [AutofillHints.email],
+      style: const TextStyle(color: CLColors.text),
+      decoration: const InputDecoration(
+        hintText: 'Email address',
+        prefixIcon: Icon(Icons.email_outlined, size: 18, color: CLColors.muted),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return TextField(
+      controller: _pwCtrl,
+      obscureText: !_pwVisible,
+      autofillHints: _isSignUp
+          ? const [AutofillHints.newPassword]
+          : const [AutofillHints.password],
+      style: const TextStyle(color: CLColors.text),
+      decoration: InputDecoration(
+        hintText: _isSignUp ? 'Create a password (min. 6 chars)' : 'Password',
+        prefixIcon: const Icon(Icons.lock_outline, size: 18, color: CLColors.muted),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _pwVisible ? Icons.visibility_off : Icons.visibility,
+            size: 18,
+            color: CLColors.muted,
+          ),
+          onPressed: () => setState(() => _pwVisible = !_pwVisible),
+        ),
+      ),
+      onSubmitted: (_) => _submit(),
+    );
+  }
+
+  Widget _buildForgotPassword() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: () async {
+          final email = _emailCtrl.text.trim();
+          if (email.isEmpty) {
+            setState(() => _errorMsg = 'Enter your email above first.');
+            return;
+          }
+          setState(() { _loading = true; _errorMsg = null; _infoMsg = null; });
+          final r = await AuthService.sendPasswordReset(email);
+          if (mounted) {
+            setState(() {
+              _loading = false;
+              _infoMsg = r.error;
+            });
+          }
+        },
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text('Forgot password?', style: TextStyle(color: CLColors.muted, fontSize: 12)),
+      ),
+    );
+  }
+
+  Widget _buildMessage(String msg, {required bool isError}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isError ? CLColors.red.withOpacity(0.08) : CLColors.green.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isError ? CLColors.red.withOpacity(0.3) : CLColors.green.withOpacity(0.3),
+        ),
+      ),
+      child: Text(
+        msg,
+        style: TextStyle(
+          color: isError ? CLColors.red : CLColors.green,
+          fontSize: 13,
+          height: 1.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _loading ? null : _submit,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+        child: _loading
+            ? const SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : Text(
+                _isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN',
+                style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.5),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: CLColors.border)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Text('or', style: const TextStyle(color: CLColors.muted, fontSize: 12)),
+        ),
+        const Expanded(child: Divider(color: CLColors.border)),
+      ],
+    );
+  }
+
+  Widget _buildGoogleButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _loading ? null : _googleSignIn,
+        icon: const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: CLColors.text)),
+        label: const Text(
+          'Continue with Google',
+          style: TextStyle(color: CLColors.text, fontWeight: FontWeight.w600),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: CLColors.border),
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          _isSignUp ? 'Already have an account?' : 'No account yet?',
+          style: const TextStyle(color: CLColors.muted, fontSize: 13),
+        ),
+        TextButton(
+          onPressed: () => setState(() {
+            _isSignUp = !_isSignUp;
+            _errorMsg = null;
+            _infoMsg = null;
+          }),
+          child: Text(
+            _isSignUp ? 'Sign in' : 'Create one free',
+            style: const TextStyle(color: CLColors.accent, fontWeight: FontWeight.w600, fontSize: 13),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuestOption() {
+    return Center(
+      child: Column(
+        children: [
+          const Text(
+            'No account needed to get started',
+            style: TextStyle(color: CLColors.muted2, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: _continueAsGuest,
+            child: const Text(
+              'Continue as Guest  →',
+              style: TextStyle(color: CLColors.muted, fontSize: 13),
+            ),
+          ),
+          const Text(
+            '3 free AI scans/day · no sync',
+            style: TextStyle(color: CLColors.muted2, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}

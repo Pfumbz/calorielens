@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'services/storage_service.dart';
+import 'services/supabase_service.dart';
 import 'theme.dart';
 import 'app_state.dart';
 import 'screens/scan_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/trends_screen.dart';
 import 'screens/coach_screen.dart';
-import 'screens/workout_screen.dart';
+import 'screens/meal_plans_screen.dart';
+import 'screens/auth/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +22,15 @@ void main() async {
     ),
   );
 
+  // Initialize local storage
   await StorageService().init();
+
+  // Initialize Supabase (will no-op gracefully if credentials are placeholders)
+  try {
+    await SupabaseService.initialize();
+  } catch (_) {
+    // Supabase not configured yet — app runs in guest-only mode
+  }
 
   runApp(
     ChangeNotifierProvider(
@@ -71,12 +81,12 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _ctrl.forward();
 
-    // Navigate to AppShell after 2.4s
+    // Navigate to shell after 2.4s
     Future.delayed(const Duration(milliseconds: 2400), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const AppShell(),
+          pageBuilder: (_, __, ___) => const AuthGate(),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 600),
@@ -149,7 +159,6 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Tagline
                 Text(
                   'AI-powered nutrition tracking',
                   style: TextStyle(
@@ -163,6 +172,53 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── AUTH GATE ────────────────────────────────────────────────────────────────
+/// Listens to Supabase auth state and routes accordingly.
+/// • Signed in → AppShell (full access)
+/// • Not signed in → LoginScreen (with "Continue as Guest")
+/// • Guest tapped → AppShell (local-only mode, 3 scans/day)
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _guestMode = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Guest chose to skip sign-in — go straight to the app
+    if (_guestMode) return const AppShell();
+
+    return StreamBuilder(
+      stream: SupabaseService.authStateChanges,
+      builder: (context, snapshot) {
+        // Show AppShell while stream is initializing (avoids flicker)
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AppShell();
+        }
+
+        final isSignedIn = SupabaseService.isSignedIn;
+
+        if (isSignedIn) {
+          // Trigger cloud sync after sign-in
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<AppState>().onSignIn();
+          });
+          return const AppShell();
+        }
+
+        // Show login screen — pass callback so "Continue as Guest" works
+        return LoginScreen(
+          onContinueAsGuest: () => setState(() => _guestMode = true),
+        );
+      },
     );
   }
 }
@@ -183,7 +239,7 @@ class _AppShellState extends State<AppShell> {
     TodayScreen(),
     TrendsScreen(),
     CoachScreen(),
-    WorkoutScreen(),
+    MealPlansScreen(),
   ];
 
   static const _navItems = [
@@ -208,9 +264,9 @@ class _AppShellState extends State<AppShell> {
       label: 'Coach',
     ),
     BottomNavigationBarItem(
-      icon: Icon(Icons.fitness_center_outlined),
-      activeIcon: Icon(Icons.fitness_center),
-      label: 'Workout',
+      icon: Icon(Icons.restaurant_menu_outlined),
+      activeIcon: Icon(Icons.restaurant_menu),
+      label: 'Meals',
     ),
   ];
 

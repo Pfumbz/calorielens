@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
+import '../services/auth_service.dart';
 import '../theme.dart';
+import '../utils/pricing.dart';
 import '../widgets/upgrade_modal.dart';
+import 'auth/login_screen.dart';
+import 'workout_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -47,14 +51,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildAccountSection(context, state),
+            const SizedBox(height: 20),
             _buildPremiumCard(context, state),
             const SizedBox(height: 20),
             _buildApiKeySection(context, state),
             const SizedBox(height: 20),
             _buildProfileSection(context, state),
+            const SizedBox(height: 20),
+            _buildFitnessSection(context),
             const SizedBox(height: 80),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAccountSection(BuildContext context, AppState state) {
+    final isSignedIn = state.isSignedIn;
+    final user = state.supabaseUser;
+    final scansLeft = state.scansRemainingToday;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isSignedIn ? Icons.cloud_done_outlined : Icons.person_outline,
+                color: isSignedIn ? CLColors.green : CLColors.muted,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isSignedIn ? 'Signed in' : 'Guest mode',
+                      style: const TextStyle(color: CLColors.text, fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      isSignedIn
+                          ? (user?.email ?? 'Account synced')
+                          : 'Sign in for cloud sync & more free scans',
+                      style: const TextStyle(color: CLColors.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (isSignedIn) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _usagePill(
+                  icon: Icons.camera_alt_outlined,
+                  label: state.isPremium || state.hasApiKey
+                      ? 'Unlimited scans'
+                      : '$scansLeft scans left today',
+                  color: scansLeft > 3 || state.isPremium || state.hasApiKey
+                      ? CLColors.green
+                      : CLColors.gold,
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (!isSignedIn)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                ),
+                child: const Text('SIGN IN / CREATE ACCOUNT'),
+              ),
+            )
+          else
+            TextButton(
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: CLColors.surface,
+                    title: const Text('Sign out?', style: TextStyle(color: CLColors.text)),
+                    content: const Text('Your data stays saved on this device.',
+                        style: TextStyle(color: CLColors.muted)),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: TextButton.styleFrom(foregroundColor: CLColors.red),
+                        child: const Text('Sign out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (ok == true && mounted) {
+                  await AuthService.signOut();
+                  await context.read<AppState>().signOut();
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: CLColors.red),
+              child: const Text('Sign out'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _usagePill({required IconData icon, required String label, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }
@@ -129,7 +258,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   backgroundColor: CLColors.gold,
                   foregroundColor: const Color(0xFF0E0C06),
                 ),
-                child: const Text('UPGRADE TO PRO — £4.99/MONTH'),
+                child: Text('UPGRADE TO PRO — ${getLocalPricing().fullPrice.toUpperCase()}'),
               ),
             )
           else
@@ -190,9 +319,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('🔑  Anthropic API Key', style: TextStyle(color: CLColors.text, fontSize: 15, fontWeight: FontWeight.w600)),
+        const Text('🔑  API Key (Optional — Power Users)', style: TextStyle(color: CLColors.text, fontSize: 15, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        const Text('Stored only on this device and sent directly to Anthropic. Never shared.',
+        const Text('Leave blank to use the built-in backend (10 free scans/day). Add your own Anthropic key for unlimited, direct access at your cost.',
             style: TextStyle(color: CLColors.muted, fontSize: 11, height: 1.4)),
         const SizedBox(height: 12),
         TextField(
@@ -237,9 +366,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        const Text('💡 Cost: ~\$0.001 per scan or coach message (Claude Haiku). Get your key at console.anthropic.com',
+        const Text('💡 BYOK: ~\$0.001 per scan/message (Claude Haiku). Get a key at console.anthropic.com',
             style: TextStyle(color: CLColors.muted, fontSize: 11, height: 1.4)),
       ],
+    );
+  }
+
+  Widget _buildFitnessSection(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WorkoutScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: CLColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: CLColors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: CLColors.blue.withOpacity(0.25)),
+              ),
+              child: const Center(
+                child: Text('💪', style: TextStyle(fontSize: 22)),
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Workout Library',
+                      style: TextStyle(
+                          color: CLColors.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                  Text('Browse exercises and start a workout',
+                      style: TextStyle(color: CLColors.muted, fontSize: 11)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: CLColors.muted, size: 20),
+          ],
+        ),
+      ),
     );
   }
 

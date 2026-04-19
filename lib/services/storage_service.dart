@@ -76,6 +76,26 @@ class StorageService {
     });
   }
 
+  // ── N-day diary (for history screen) ──────────────────────────────
+  /// Returns diary entries for the last [days] days, most recent first.
+  /// Only returns days that have at least one entry.
+  List<({DateTime date, List<DiaryEntry> entries})> getDiaryRange({int days = 30}) {
+    final results = <({DateTime date, List<DiaryEntry> entries})>[];
+    for (int i = 0; i < days; i++) {
+      final d = DateTime.now().subtract(Duration(days: i));
+      final entries = getDiary(date: d);
+      if (entries.isNotEmpty) {
+        results.add((date: d, entries: entries));
+      }
+    }
+    return results;
+  }
+
+  /// Returns the total calories for a given date.
+  int totalCaloriesForDate(DateTime date) {
+    return getDiary(date: date).fold(0, (sum, e) => sum + e.calories);
+  }
+
   // ── Profile ───────────────────────────────────────────────────────
   UserProfile get profile {
     final raw = _prefs.getString('cl5_profile');
@@ -124,4 +144,42 @@ class StorageService {
   // ── Onboarded ─────────────────────────────────────────────────────
   bool get isOnboarded => _prefs.getBool('cl5_onboarded') ?? false;
   Future<void> setOnboarded() => _prefs.setBool('cl5_onboarded', true);
+
+  // ── Saved meal plans ─────────────────────────────────────────────
+  List<String> get savedPlanIds {
+    return _prefs.getStringList('cl5_saved_plans') ?? [];
+  }
+
+  Future<void> savePlanId(String planId) async {
+    final ids = savedPlanIds;
+    if (!ids.contains(planId)) {
+      ids.add(planId);
+      await _prefs.setStringList('cl5_saved_plans', ids);
+    }
+  }
+
+  Future<void> removePlanId(String planId) async {
+    final ids = savedPlanIds;
+    ids.remove(planId);
+    await _prefs.setStringList('cl5_saved_plans', ids);
+  }
+
+  bool isPlanSaved(String planId) => savedPlanIds.contains(planId);
+
+  // ── AI-generated meal plans (JSON strings) ───────────────────────
+  List<String> get generatedPlansJson {
+    return _prefs.getStringList('cl5_gen_plans') ?? [];
+  }
+
+  Future<void> saveGeneratedPlan(String planJson) async {
+    final plans = generatedPlansJson;
+    plans.insert(0, planJson); // newest first
+    // Keep max 10 generated plans
+    if (plans.length > 10) plans.removeRange(10, plans.length);
+    await _prefs.setStringList('cl5_gen_plans', plans);
+  }
+
+  Future<void> clearGeneratedPlans() async {
+    await _prefs.remove('cl5_gen_plans');
+  }
 }
