@@ -221,6 +221,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearAllEntries() async {
+    await _storage.saveDiary([]);
+    _diary = [];
+    notifyListeners();
+  }
+
   // ── Water ────────────────────────────────────────────────────────────────
   Future<void> setWater(int glasses) async {
     await _storage.saveWater(glasses);

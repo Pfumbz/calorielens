@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../models/models.dart';
 import '../theme.dart';
 import 'history_screen.dart';
+import 'trends_screen.dart';
 
 class TodayScreen extends StatelessWidget {
   const TodayScreen({super.key});
@@ -26,23 +27,38 @@ class TodayScreen extends StatelessWidget {
               _buildMacroBars(state),
               const SizedBox(height: 16),
               _buildWaterTracker(context, state),
+              const SizedBox(height: 12),
+              _buildTrendsButton(context),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Today\'s Meals', style: TextStyle(color: CLColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('History', style: TextStyle(color: CLColors.accent.withOpacity(0.8), fontSize: 12)),
-                        const SizedBox(width: 3),
-                        Icon(Icons.chevron_right, color: CLColors.accent.withOpacity(0.8), size: 16),
-                      ],
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (state.diary.length > 3)
+                        GestureDetector(
+                          onTap: () => _showClearAll(context),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 14),
+                            child: Text('Clear all', style: TextStyle(color: CLColors.red.withOpacity(0.8), fontSize: 12)),
+                          ),
+                        ),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('History', style: TextStyle(color: CLColors.accent.withOpacity(0.8), fontSize: 12)),
+                            const SizedBox(width: 3),
+                            Icon(Icons.chevron_right, color: CLColors.accent.withOpacity(0.8), size: 16),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -251,6 +267,34 @@ class TodayScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildTrendsButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const TrendsScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CLColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.trending_up, color: CLColors.accent.withOpacity(0.8), size: 18),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('Weekly Trends', style: TextStyle(color: CLColors.text, fontSize: 13)),
+            ),
+            Text('View insights', style: TextStyle(color: CLColors.accent.withOpacity(0.8), fontSize: 12)),
+            const SizedBox(width: 3),
+            Icon(Icons.chevron_right, color: CLColors.accent.withOpacity(0.8), size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -302,22 +346,52 @@ class TodayScreen extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(e.name, style: const TextStyle(color: CLColors.text, fontSize: 14, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 3),
-                Text(
-                  '${e.time} · P:${e.protein}g  C:${e.carbs}g  F:${e.fat}g',
-                  style: const TextStyle(color: CLColors.muted, fontSize: 11),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: CLColors.text, fontSize: 14, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${e.time} · P:${e.protein}g  C:${e.carbs}g  F:${e.fat}g',
+                    style: const TextStyle(color: CLColors.muted, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             Text('${e.calories}', style: const TextStyle(color: CLColors.accent, fontSize: 16, fontWeight: FontWeight.w700)),
             const Text(' kcal', style: TextStyle(color: CLColors.muted, fontSize: 11)),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showClearAll(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: CLColors.surface,
+        title: const Text('Clear all meals?', style: TextStyle(color: CLColors.text)),
+        content: Text(
+          'This will remove all ${context.read<AppState>().diary.length} meals logged today. This cannot be undone.',
+          style: const TextStyle(color: CLColors.muted),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              context.read<AppState>().clearAllEntries();
+              Navigator.pop(context);
+            },
+            style: TextButton.styleFrom(foregroundColor: CLColors.red),
+            child: const Text('Clear all'),
+          ),
+        ],
       ),
     );
   }

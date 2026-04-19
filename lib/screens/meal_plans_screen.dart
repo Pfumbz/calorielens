@@ -310,18 +310,16 @@ class _PlanCard extends StatelessWidget {
                       style: const TextStyle(
                           color: CLColors.muted, fontSize: 11, height: 1.3)),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       _tag('R${plan.estimatedCostZAR.toStringAsFixed(0)}',
                           _accentColor),
-                      const SizedBox(width: 6),
                       _tag('${plan.totalCalories} kcal', CLColors.muted),
-                      const SizedBox(width: 6),
                       _tag('${plan.prepTimeMin} min', CLColors.muted),
-                      if (plan.servings > 1) ...[
-                        const SizedBox(width: 6),
+                      if (plan.servings > 1)
                         _tag('${plan.servings} servings', CLColors.muted),
-                      ],
                     ],
                   ),
                 ],

@@ -162,11 +162,9 @@ class _ExerciseCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(exercise.muscles, style: const TextStyle(color: CLColors.muted, fontSize: 11)),
                     const SizedBox(height: 6),
-                    Row(children: [
+                    Wrap(spacing: 6, runSpacing: 4, children: [
                       _tag('${exercise.sets} sets'),
-                      const SizedBox(width: 6),
                       _tag(exercise.reps),
-                      const SizedBox(width: 6),
                       _tag('Rest ${exercise.rest}'),
                     ]),
                   ],

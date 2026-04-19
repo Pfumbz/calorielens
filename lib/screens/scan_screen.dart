@@ -262,18 +262,20 @@ class _ScanScreenState extends State<ScanScreen>
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: (state.isSignedIn || state.hasApiKey)
+                        color: (state.isPremium || state.hasApiKey)
                             ? CLColors.green
-                            : CLColors.gold,
+                            : state.isSignedIn
+                                ? CLColors.green
+                                : CLColors.gold,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      state.isSignedIn
-                          ? '${state.scansRemainingToday} left'
-                          : state.hasApiKey
-                              ? 'BYOK'
+                      (state.isPremium || state.hasApiKey)
+                          ? 'Unlimited'
+                          : state.isSignedIn
+                              ? '${state.scansRemainingToday} left'
                               : 'Guest',
                       style: TextStyle(
                           color: (state.isSignedIn || state.hasApiKey)
@@ -572,9 +574,12 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── SCAN LIMIT BAR ──────────────────────────────────────────────────────────
   Widget _buildScanLimit(AppState state) {
-    final used = StorageService().scanCountToday;
-    final left = (3 - used).clamp(0, 3);
-    final pct = used / 3.0;
+    // Hide for premium/BYOK users
+    final total = state.hasApiKey || state.isPremium ? 999 : state.isSignedIn ? 10 : 3;
+    if (total >= 999) return const SizedBox.shrink();
+    final left = state.scansRemainingToday;
+    final used = (total - left).clamp(0, total);
+    final pct = used / total;
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(
@@ -583,11 +588,11 @@ class _ScanScreenState extends State<ScanScreen>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: pct,
+                value: pct.clamp(0.0, 1.0),
                 backgroundColor: CLColors.border,
-                color: left == 0
+                color: left <= 0
                     ? CLColors.red
-                    : left == 1
+                    : left <= (total * 0.2)
                         ? CLColors.accent
                         : CLColors.green,
                 minHeight: 4,
@@ -596,12 +601,12 @@ class _ScanScreenState extends State<ScanScreen>
           ),
           const SizedBox(width: 10),
           Text(
-            left == 0
+            left <= 0
                 ? 'Limit reached'
                 : '$left scan${left == 1 ? '' : 's'} left',
             style: TextStyle(
               fontSize: 11,
-              color: left == 0 ? CLColors.red : CLColors.muted,
+              color: left <= 0 ? CLColors.red : CLColors.muted,
             ),
           ),
           const SizedBox(width: 8),

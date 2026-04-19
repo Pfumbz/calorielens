@@ -7,7 +7,6 @@ import 'theme.dart';
 import 'app_state.dart';
 import 'screens/scan_screen.dart';
 import 'screens/today_screen.dart';
-import 'screens/trends_screen.dart';
 import 'screens/coach_screen.dart';
 import 'screens/meal_plans_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -237,7 +236,6 @@ class _AppShellState extends State<AppShell> {
   static const _screens = [
     ScanScreen(),
     TodayScreen(),
-    TrendsScreen(),
     CoachScreen(),
     MealPlansScreen(),
   ];
@@ -252,11 +250,6 @@ class _AppShellState extends State<AppShell> {
       icon: Icon(Icons.bar_chart_outlined),
       activeIcon: Icon(Icons.bar_chart),
       label: 'Today',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.trending_up_outlined),
-      activeIcon: Icon(Icons.trending_up),
-      label: 'Trends',
     ),
     BottomNavigationBarItem(
       icon: Icon(Icons.smart_toy_outlined),

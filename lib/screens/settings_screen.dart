@@ -6,7 +6,6 @@ import '../theme.dart';
 import '../utils/pricing.dart';
 import '../widgets/upgrade_modal.dart';
 import 'auth/login_screen.dart';
-import 'workout_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _weightCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
   bool _keyVisible  = false;
+  bool _showAdvanced = false;
 
   @override
   void initState() {
@@ -55,11 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 20),
             _buildPremiumCard(context, state),
             const SizedBox(height: 20),
-            _buildApiKeySection(context, state),
-            const SizedBox(height: 20),
             _buildProfileSection(context, state),
             const SizedBox(height: 20),
-            _buildFitnessSection(context),
+            _buildAdvancedToggle(context, state),
             const SizedBox(height: 80),
           ],
         ),
@@ -372,52 +370,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildFitnessSection(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const WorkoutScreen()),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: CLColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: CLColors.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: CLColors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: CLColors.blue.withOpacity(0.25)),
-              ),
-              child: const Center(
-                child: Text('💪', style: TextStyle(fontSize: 22)),
-              ),
+  Widget _buildAdvancedToggle(BuildContext context, AppState state) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: CLColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: CLColors.border),
             ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Workout Library',
-                      style: TextStyle(
-                          color: CLColors.text,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600)),
-                  Text('Browse exercises and start a workout',
-                      style: TextStyle(color: CLColors.muted, fontSize: 11)),
-                ],
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.code, color: CLColors.muted, size: 18),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('Advanced / Developer',
+                      style: TextStyle(color: CLColors.muted, fontSize: 13)),
+                ),
+                Icon(
+                  _showAdvanced ? Icons.expand_less : Icons.expand_more,
+                  color: CLColors.muted, size: 20,
+                ),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: CLColors.muted, size: 20),
-          ],
+          ),
         ),
-      ),
+        if (_showAdvanced) ...[
+          const SizedBox(height: 14),
+          _buildApiKeySection(context, state),
+        ],
+      ],
     );
   }
 
