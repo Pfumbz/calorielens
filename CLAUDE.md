@@ -109,7 +109,7 @@ All colours are in `lib/theme.dart` as `CLColors` static constants (e.g. `CLColo
 
 - **Windows file locking:** Gradle daemons frequently lock `build/app/intermediates/assets/debug/mergeDebugAssets` on Windows. The fix is always: kill Java processes → delete `build/` → re-run. Restarting the PC is the nuclear option.
 - **No `supabase_flutter` URL property on client:** Use `SupabaseConfig.supabaseUrl` (the constant) not `SupabaseService.client.supabaseUrl` — the latter doesn't exist in v2 of the library.
-- **Google Sign-In not yet functional:** Requires SHA-1 fingerprint registered in Google Cloud Console + `google-services.json` placed at `android/app/google-services.json`. Error code 10 = DEVELOPER_ERROR = missing SHA-1.
+- **Google Sign-In configured:** OAuth set up in Google Cloud Console (project `refined-legend-330812`). Android client (SHA-1 debug key), Web client (for Supabase), and `google-services.json` at `android/app/`. Google provider enabled in Supabase Auth. OAuth consent screen is in "Testing" mode — only `makhuvhap.c@gmail.com` is whitelisted as a test user. To add more testers or go live, visit Google Cloud Console → Google Auth Platform → Audience.
 - **iOS not yet configured:** Requires Apple Developer Program enrolment ($99/year). iOS build from Codemagic produces an unsigned `Runner.app.zip` that cannot run on a real device.
 - **Email confirmation:** Supabase has email confirmation enabled by default. Disable it in Supabase Dashboard → Authentication → Providers → Email → toggle off "Confirm email" for better UX.
 - **Scan limit display in ScanScreen:** The header pill shows `scansRemainingToday` for signed-in users, "BYOK" for API key users, "Guest" for unauthenticated — it uses `state.isSignedIn` and `state.hasApiKey`.
@@ -127,10 +127,10 @@ Edge Functions require the `ANTHROPIC_API_KEY` secret set in Supabase Dashboard 
 
 ## Pending Work (as of last session)
 
-1. **Google Sign-In setup** — get debug SHA-1 (`keytool -list -v -keystore "$env:USERPROFILE\.android\debug.keystore" -alias androiddebugkey -storepass android`), register in Google Cloud Console, download `google-services.json` to `android/app/`, enable Google provider in Supabase Auth.
+1. ~~**Google Sign-In setup**~~ — ✅ DONE. OAuth configured in Google Cloud Console, `google-services.json` placed, Supabase Google provider enabled, test user added.
 2. **Disable Supabase email confirmation** — otherwise email sign-up requires clicking a link before sign-in works.
 3. **End-to-end test** — sign in with the test email account, attempt an AI scan, check Edge Function logs in Supabase Dashboard → Edge Functions → select function → Logs tab.
-4. **Push to GitHub → Codemagic rebuild** — all Phase 1 changes need a fresh cloud build to produce an installable APK.
+4. **Push to GitHub → Codemagic rebuild** — all changes need a fresh cloud build to produce an installable APK.
 5. **In-app purchases** — the upgrade modal UI exists (`lib/widgets/upgrade_modal.dart`) but no real payment processor is connected.
-6. **Meal history screen** — currently only today's diary is shown; past days are stored locally but no UI to browse them.
-7. **Barcode scanning** — not yet implemented.
+6. **Barcode scanning** — not yet implemented.
+7. **Clean up duplicate Web client secret** — Google Cloud Console has two secrets on the Web OAuth client. Disable and delete the old one (`****kzYw`) once the new one (`****DCE4`) is confirmed working in Supabase.

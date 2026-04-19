@@ -25,9 +25,8 @@ class AuthResult {
 class AuthService {
   static final _client = SupabaseService.client;
 
-  // TODO: Replace with your Google OAuth Web Client ID
-  // From: Google Cloud Console → APIs & Services → Credentials
-  static const _googleWebClientId = 'YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com';
+  // Google OAuth Web Client ID (from Google Cloud Console, project: refined-legend-330812)
+  static const _googleWebClientId = '1053726882620-r90gu6qi0854d314rurligsnemks6qme.apps.googleusercontent.com';
 
   // ── Email / Password ─────────────────────────────────────────────────────
   static Future<AuthResult> signUpWithEmail(

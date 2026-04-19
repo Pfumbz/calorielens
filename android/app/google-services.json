@@ -1,0 +1,43 @@
+{
+  "project_info": {
+    "project_number": "1053726882620",
+    "project_id": "refined-legend-330812",
+    "storage_bucket": "refined-legend-330812.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1053726882620:android:placeholder",
+        "android_client_info": {
+          "package_name": "com.example.calorielens"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1053726882620-8p6assjrtj9a8hv11gcshhfmsnoio8ds.apps.googleusercontent.com",
+          "client_type": 1
+        },
+        {
+          "client_id": "1053726882620-r90gu6qi0854d314rurligsnemks6qme.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "placeholder"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1053726882620-r90gu6qi0854d314rurligsnemks6qme.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
