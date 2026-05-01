@@ -1,13 +1,17 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/models.dart';
+import '../services/openfoodfacts_service.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
 import '../widgets/upgrade_modal.dart';
 import 'settings_screen.dart';
+
+enum _ScanMode { photo, text, barcode }
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -20,13 +24,19 @@ class _ScanScreenState extends State<ScanScreen>
     with SingleTickerProviderStateMixin {
   final _picker = ImagePicker();
   final _textCtrl = TextEditingController();
+  final _barcodeNameCtrl = TextEditingController();
 
   Uint8List? _imageBytes;
   String _mediaType = 'image/jpeg';
-  bool _textMode = false;
+  _ScanMode _scanMode = _ScanMode.photo;
   bool _loading = false;
   String? _error;
   ScanResult? _result;
+
+  // Barcode state
+  bool _barcodeScanned = false;
+  String? _scannedBarcode;
+  BarcodeResult? _barcodeResult;
 
   // Animation for result panel appearing
   late AnimationController _resultAnim;
@@ -46,26 +56,56 @@ class _ScanScreenState extends State<ScanScreen>
       begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _resultAnim, curve: Curves.easeOut));
+    // Recover any image lost due to Android activity restart
+    _recoverLostImage();
   }
 
   @override
   void dispose() {
     _textCtrl.dispose();
+    _barcodeNameCtrl.dispose();
     _resultAnim.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final img = await _picker.pickImage(source: source, imageQuality: 85);
-    if (img == null) return;
-    final bytes = await img.readAsBytes();
-    final ext = img.path.toLowerCase();
-    setState(() {
-      _imageBytes = bytes;
-      _mediaType = ext.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      _result = null;
-      _error = null;
-    });
+    try {
+      final img = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+      if (img == null) return;
+      final bytes = await img.readAsBytes();
+      final ext = img.path.toLowerCase();
+      setState(() {
+        _imageBytes = bytes;
+        _mediaType = ext.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        _result = null;
+        _error = null;
+      });
+    } catch (e) {
+      debugPrint('Image pick error: $e');
+      // Try to recover lost data (Android activity restart)
+      await _recoverLostImage();
+    }
+  }
+
+  /// Recovers image data when Android kills the activity during gallery pick.
+  Future<void> _recoverLostImage() async {
+    try {
+      final response = await _picker.retrieveLostData();
+      if (response.isEmpty || response.file == null) return;
+      final bytes = await response.file!.readAsBytes();
+      final ext = response.file!.path.toLowerCase();
+      setState(() {
+        _imageBytes = bytes;
+        _mediaType = ext.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        _result = null;
+        _error = null;
+      });
+    } catch (_) {}
   }
 
   Future<void> _analyse() async {
@@ -84,7 +124,7 @@ class _ScanScreenState extends State<ScanScreen>
     try {
       final svc = state.backend;
       ScanResult res;
-      if (_textMode) {
+      if (_scanMode == _ScanMode.text) {
         final desc = _textCtrl.text.trim();
         if (desc.isEmpty) throw Exception('Enter a description first.');
         res = await svc.scanText(desc);
@@ -130,12 +170,15 @@ class _ScanScreenState extends State<ScanScreen>
               borderRadius: BorderRadius.circular(10)),
         ),
       );
-      // ✅ Reset entire scan state — image + result + text
+      // ✅ Reset entire scan state — image + result + text + barcode
       setState(() {
         _result = null;
         _imageBytes = null;
         _error = null;
         _textCtrl.clear();
+        _barcodeScanned = false;
+        _scannedBarcode = null;
+        _barcodeResult = null;
       });
       _resultAnim.reset();
     }
@@ -148,6 +191,9 @@ class _ScanScreenState extends State<ScanScreen>
       _imageBytes = null;
       _error = null;
       _textCtrl.clear();
+      _barcodeScanned = false;
+      _scannedBarcode = null;
+      _barcodeResult = null;
     });
     _resultAnim.reset();
   }
@@ -171,10 +217,15 @@ class _ScanScreenState extends State<ScanScreen>
               else ...[
                 _buildModeToggle(),
                 const SizedBox(height: 16),
-                if (_textMode) _buildTextInput() else _buildImagePicker(),
+                if (_scanMode == _ScanMode.text)
+                  _buildTextInput()
+                else if (_scanMode == _ScanMode.barcode)
+                  _buildBarcodeScanner()
+                else
+                  _buildImagePicker(),
                 if (!state.isPremium) _buildScanLimit(state),
                 const SizedBox(height: 14),
-                if (_error != null) _buildError(),
+                if (_error != null && _scanMode != _ScanMode.barcode) _buildError(),
                 _buildAnalyseBtn(),
               ],
               const SizedBox(height: 40),
@@ -303,16 +354,12 @@ class _ScanScreenState extends State<ScanScreen>
       padding: const EdgeInsets.all(4),
       child: Row(
         children: [
-          _modeBtn('📸  Photo', !_textMode,
-              () => setState(() {
-                    _textMode = false;
-                    _result = null;
-                  })),
-          _modeBtn('✏️  Describe', _textMode,
-              () => setState(() {
-                    _textMode = true;
-                    _result = null;
-                  })),
+          _modeBtn('📸  Photo', _scanMode == _ScanMode.photo,
+              () => _switchMode(_ScanMode.photo)),
+          _modeBtn('✏️  Describe', _scanMode == _ScanMode.text,
+              () => _switchMode(_ScanMode.text)),
+          _modeBtn('📦  Barcode', _scanMode == _ScanMode.barcode,
+              () => _switchMode(_ScanMode.barcode)),
         ],
       ),
     );
@@ -343,6 +390,259 @@ class _ScanScreenState extends State<ScanScreen>
         ),
       ),
     );
+  }
+
+  void _switchMode(_ScanMode mode) {
+    setState(() {
+      _scanMode = mode;
+      _result = null;
+      _error = null;
+      // Reset barcode state when switching away
+      if (mode != _ScanMode.barcode) {
+        _barcodeScanned = false;
+        _scannedBarcode = null;
+        _barcodeResult = null;
+      }
+    });
+  }
+
+  // ── BARCODE SCANNER ────────────────────────────────────────────────────────
+  Widget _buildBarcodeScanner() {
+    // After barcode is scanned, show the result (loading or found)
+    if (_barcodeScanned) {
+      return _buildBarcodeResultCard();
+    }
+
+    // Live camera barcode scanner
+    return Container(
+      height: 300,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          MobileScanner(
+            onDetect: _onBarcodeDetected,
+          ),
+          // Overlay with scan guide
+          Center(
+            child: Container(
+              width: 220,
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: CLColors.accent, width: 2),
+              ),
+            ),
+          ),
+          // Instructions at bottom
+          Positioned(
+            bottom: 16,
+            left: 0,
+            right: 0,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Point camera at barcode',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 13,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onBarcodeDetected(BarcodeCapture capture) {
+    if (_barcodeScanned) return; // prevent multiple triggers
+    final barcodes = capture.barcodes;
+    if (barcodes.isEmpty || barcodes.first.rawValue == null) return;
+
+    final code = barcodes.first.rawValue!;
+    setState(() {
+      _barcodeScanned = true;
+      _scannedBarcode = code;
+      _loading = true;
+    });
+
+    _lookupBarcode(code);
+  }
+
+  Future<void> _lookupBarcode(String barcode) async {
+    try {
+      final result = await OpenFoodFactsService.lookup(barcode);
+      if (!mounted) return;
+
+      if (result != null && result.nutrition != null) {
+        // Product found with nutrition data — show it as a scan result
+        setState(() {
+          _barcodeResult = result;
+          _result = result.nutrition;
+          _loading = false;
+        });
+        _resultAnim.forward(from: 0);
+      } else if (result != null && result.productName.isNotEmpty) {
+        // Product found but no nutrition data — send name to AI
+        setState(() {
+          _barcodeResult = result;
+          _loading = false;
+        });
+        _aiEstimateFromBarcode(result.displayName);
+      } else {
+        // Completely unknown — let user type the product name
+        setState(() {
+          _barcodeResult = result;
+          _loading = false;
+          // _error stays null — the not-found card handles the UI
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Lookup failed: ${e.toString().replaceFirst("Exception: ", "")}';
+      });
+    }
+  }
+
+  Future<void> _aiEstimateFromBarcode(String productDescription) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final state = Provider.of<AppState>(context, listen: false);
+      final result = await state.backend.scanText(productDescription);
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+      _resultAnim.forward(from: 0);
+      await state.trackScan();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Widget _buildBarcodeResultCard() {
+    if (_loading) {
+      return Container(
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: CLColors.border),
+        ),
+        child: Column(
+          children: [
+            const CircularProgressIndicator(color: CLColors.accent),
+            const SizedBox(height: 16),
+            Text(
+              'Looking up barcode $_scannedBarcode...',
+              style: const TextStyle(color: CLColors.muted, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // If we already have a result, it'll be shown by _buildResultPanel
+    if (_result != null) return const SizedBox.shrink();
+
+    // Not-found state — let user type the product name for AI estimation
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.border),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.search_off, color: CLColors.muted, size: 40),
+          const SizedBox(height: 12),
+          Text(
+            'Product not found for barcode $_scannedBarcode',
+            style: const TextStyle(color: CLColors.muted, fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Type the product name and we\'ll estimate the nutrition with AI.',
+            style: TextStyle(color: CLColors.muted, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _barcodeNameCtrl,
+            style: const TextStyle(color: CLColors.text, fontSize: 14),
+            decoration: const InputDecoration(
+              hintText: 'e.g. Simba Chips Original 125g',
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+            ),
+            textInputAction: TextInputAction.go,
+            onSubmitted: (_) => _submitBarcodeName(),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _submitBarcodeName,
+              icon: const Icon(Icons.auto_awesome, size: 16),
+              label: const Text('ESTIMATE WITH AI',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CLColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _barcodeScanned = false;
+                _scannedBarcode = null;
+                _barcodeResult = null;
+                _error = null;
+              });
+            },
+            icon: const Icon(Icons.qr_code_scanner, size: 16),
+            label: const Text('Scan Another Barcode'),
+            style: TextButton.styleFrom(
+              foregroundColor: CLColors.muted,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submitBarcodeName() {
+    final name = _barcodeNameCtrl.text.trim();
+    if (name.isEmpty) return;
+    _barcodeNameCtrl.clear();
+    _aiEstimateFromBarcode(name);
   }
 
   // ── PHASE 2 + 3: REDESIGNED IMAGE PICKER ────────────────────────────────────
@@ -641,8 +941,10 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── ANALYSE BUTTON ──────────────────────────────────────────────────────────
   Widget _buildAnalyseBtn() {
+    // Barcode mode uses its own flow — hide the analyse button
+    if (_scanMode == _ScanMode.barcode) return const SizedBox.shrink();
     final canGo =
-        _textMode ? _textCtrl.text.trim().length > 3 : _imageBytes != null;
+        _scanMode == _ScanMode.text ? _textCtrl.text.trim().length > 3 : _imageBytes != null;
 
     return SizedBox(
       width: double.infinity,
@@ -674,6 +976,163 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   // ── PHASE 2 + 5: RESULT PANEL (animated slide-up) ───────────────────────────
+  void _showEditSheet(ScanResult r) {
+    // Build editable list of item names from the scan result
+    final itemCtrls = r.items
+        .map((item) => TextEditingController(text: item.name))
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: CLColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                left: 20, right: 20, top: 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Correct Food Items',
+                        style: TextStyle(color: CLColors.text, fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    const Text(
+                        'Fix any item names the AI got wrong, then re-analyse to recalculate nutrition.',
+                        style: TextStyle(color: CLColors.muted, fontSize: 12)),
+                    const SizedBox(height: 14),
+                    // Editable item list
+                    ...List.generate(itemCtrls.length, (i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: itemCtrls[i],
+                              style: const TextStyle(color: CLColors.text, fontSize: 14),
+                              decoration: InputDecoration(
+                                hintText: 'Food item ${i + 1}',
+                                prefixIcon: Padding(
+                                  padding: const EdgeInsets.only(left: 12, right: 8),
+                                  child: Text('${i + 1}.',
+                                      style: const TextStyle(
+                                          color: CLColors.accent, fontSize: 14,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                                prefixIconConstraints:
+                                    const BoxConstraints(minWidth: 0, minHeight: 0),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 12),
+                              ),
+                            ),
+                          ),
+                          if (itemCtrls.length > 1)
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18,
+                                  color: CLColors.muted),
+                              onPressed: () {
+                                setSheetState(() {
+                                  itemCtrls[i].dispose();
+                                  itemCtrls.removeAt(i);
+                                });
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 36, minHeight: 36),
+                            ),
+                        ],
+                      ),
+                    )),
+                    // Add item button
+                    TextButton.icon(
+                      onPressed: () {
+                        setSheetState(() {
+                          itemCtrls.add(TextEditingController());
+                        });
+                      },
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add item'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: CLColors.accent,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Re-analyse button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          final items = itemCtrls
+                              .map((c) => c.text.trim())
+                              .where((t) => t.isNotEmpty)
+                              .toList();
+                          if (items.isEmpty) return;
+                          Navigator.pop(ctx);
+                          _reAnalyse(items);
+                        },
+                        icon: const Icon(Icons.auto_fix_high, size: 18),
+                        label: const Text('RE-ANALYSE',
+                            style: TextStyle(fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CLColors.accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Takes corrected item names, sends them to the AI for fresh nutrition analysis.
+  Future<void> _reAnalyse(List<String> items) async {
+    final description = items.join(', ');
+    setState(() {
+      _loading = true;
+      _result = null;
+    });
+    _resultAnim.reset();
+
+    try {
+      final state = Provider.of<AppState>(context, listen: false);
+      final result = await state.backend.scanText(description);
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+      _resultAnim.forward(from: 0);
+      await state.trackScan();
+    } catch (e) {
+      setState(() => _loading = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
   Widget _buildResultPanel(ScanResult r) {
     return FadeTransition(
       opacity: _resultFade,
@@ -759,23 +1218,40 @@ class _ScanScreenState extends State<ScanScreen>
                         height: 1.5)),
               ),
             const SizedBox(height: 18),
-            // Log button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _logMeal,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('LOG THIS MEAL',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: CLColors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+            // Log + Edit buttons
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _logMeal,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('LOG MEAL',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CLColors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showEditSheet(r),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Correct'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: CLColors.accent,
+                      side: BorderSide(color: CLColors.accent.withOpacity(0.4)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             // Discard / scan again button

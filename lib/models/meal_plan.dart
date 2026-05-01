@@ -15,6 +15,7 @@ class MealPlan {
   final int servings;
   final int prepTimeMin;
   final String emoji; // used as visual icon on card
+  final String? imageUrl; // hero photo URL (from FoodImageService or AI)
   final List<PlanMeal> meals;
   final List<String> tags;
 
@@ -32,6 +33,7 @@ class MealPlan {
     required this.servings,
     required this.prepTimeMin,
     required this.emoji,
+    this.imageUrl,
     required this.meals,
     this.tags = const [],
   });

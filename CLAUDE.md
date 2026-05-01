@@ -127,10 +127,28 @@ Edge Functions require the `ANTHROPIC_API_KEY` secret set in Supabase Dashboard 
 
 ## Pending Work (as of last session)
 
-1. ~~**Google Sign-In setup**~~ — ✅ DONE. OAuth configured in Google Cloud Console, `google-services.json` placed, Supabase Google provider enabled, test user added.
-2. **Disable Supabase email confirmation** — otherwise email sign-up requires clicking a link before sign-in works.
-3. **End-to-end test** — sign in with the test email account, attempt an AI scan, check Edge Function logs in Supabase Dashboard → Edge Functions → select function → Logs tab.
-4. **Push to GitHub → Codemagic rebuild** — all changes need a fresh cloud build to produce an installable APK.
-5. **In-app purchases** — the upgrade modal UI exists (`lib/widgets/upgrade_modal.dart`) but no real payment processor is connected.
-6. **Barcode scanning** — not yet implemented.
-7. **Clean up duplicate Web client secret** — Google Cloud Console has two secrets on the Web OAuth client. Disable and delete the old one (`****kzYw`) once the new one (`****DCE4`) is confirmed working in Supabase.
+1. ~~**Google Sign-In setup**~~ — ✅ DONE.
+2. ~~**Disable Supabase email confirmation**~~ — ✅ DONE.
+3. ~~**End-to-end test**~~ — ✅ DONE. AI scan works via Edge Functions.
+4. ~~**Push to GitHub → Codemagic rebuild**~~ — ✅ DONE. Nav restructure, settings cleanup, bug fixes all pushed.
+5. ~~**Clean up duplicate Web client secret**~~ — ✅ DONE. Old secret (`****kzYw`) deleted.
+6. **In-app purchases** — the upgrade modal UI exists (`lib/widgets/upgrade_modal.dart`) but no real payment processor is connected. Needs Google Play Billing integration.
+7. ~~**Barcode scanning**~~ — ✅ DONE. Uses `mobile_scanner` + Open Food Facts API with AI fallback.
+8. **Dead code cleanup** — `workout_screen.dart` and `data/exercises.dart` are no longer referenced from navigation. Can be deleted.
+
+### Recent Changes (April 2026)
+- Restructured bottom nav from 5 tabs to 4: Scan · Today · Coach · Meals
+- Trends accessible from Today screen via "Weekly Trends" button
+- Removed Workout tab and Workout Library from Settings
+- API Key section hidden behind collapsible "Advanced / Developer" toggle in Settings
+- Fixed overflow bugs (Wrap instead of Row for tag chips, Expanded for diary entries)
+- Fixed scan count to use AppState.scansRemainingToday (unified source of truth)
+- Scan limit pill shows "Unlimited" for Pro/BYOK users instead of "999 left"
+- Added "Clear all" button for bulk-deleting diary entries
+
+### Recent Changes (May 2026)
+- Fixed model IDs: vision scans now use `claude-sonnet-4-6`, text/chat use `claude-haiku-4-5-20251001`
+- Simplified edit flow: "Correct" button lets users fix food item names, then AI re-analyses nutrition (no manual calorie/macro editing)
+- Fixed keyboard overlapping edit sheet (SingleChildScrollView + correct BuildContext for viewInsets)
+- Fixed gallery image picker crash (added maxWidth/maxHeight + retrieveLostData for Android activity restart)
+- Added barcode scanning: third mode in Scan tab (Photo / Describe / Barcode), uses Open Food Facts API for nutrition lookup, falls back to AI estimation if product not found

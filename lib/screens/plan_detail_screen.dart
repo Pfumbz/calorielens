@@ -1,16 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/meal_plan.dart';
 import '../models/models.dart';
+import '../services/food_image_service.dart';
 import '../theme.dart';
 import 'meal_detail_screen.dart';
 
 /// Full detail view for a single meal plan.
 /// Shows macro summary, cost, and list of meals for the day.
-class PlanDetailScreen extends StatelessWidget {
+class PlanDetailScreen extends StatefulWidget {
   final MealPlan plan;
   const PlanDetailScreen({super.key, required this.plan});
+
+  @override
+  State<PlanDetailScreen> createState() => _PlanDetailScreenState();
+}
+
+class _PlanDetailScreenState extends State<PlanDetailScreen> {
+  late Future<String> _heroImageFuture;
+
+  MealPlan get plan => widget.plan;
+
+  @override
+  void initState() {
+    super.initState();
+    _heroImageFuture = FoodImageService.getSmartImageUrl(plan.name, hero: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,40 +58,64 @@ class PlanDetailScreen extends StatelessWidget {
               }),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      CLColors.accent.withOpacity(0.15),
-                      CLColors.bg,
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  FutureBuilder<String>(
+                    future: _heroImageFuture,
+                    builder: (context, snap) {
+                      final url = snap.data ?? plan.imageUrl ?? FoodImageService.getHeroUrl(plan.name);
+                      return CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(color: CLColors.surface2),
+                        errorWidget: (_, __, ___) => Container(
+                          color: CLColors.surface2,
+                          child: Center(child: Text(plan.emoji, style: const TextStyle(fontSize: 56))),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 40),
-                      Text(plan.emoji,
-                          style: const TextStyle(fontSize: 56)),
-                      const SizedBox(height: 10),
-                      Text(plan.name,
-                          style: const TextStyle(
-                              color: CLColors.text,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Text(plan.description,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: CLColors.muted,
-                              fontSize: 12,
-                              height: 1.4)),
-                    ],
+                  // Gradient overlay for text readability
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          CLColors.bg.withOpacity(0.7),
+                          CLColors.bg,
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.2, 0.7, 1.0],
+                      ),
+                    ),
                   ),
-                ),
+                  // Title text at the bottom
+                  Positioned(
+                    bottom: 16,
+                    left: 20,
+                    right: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(plan.name,
+                            style: const TextStyle(
+                                color: CLColors.text,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text(plan.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: CLColors.muted,
+                                fontSize: 12,
+                                height: 1.4)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -87,15 +128,9 @@ class PlanDetailScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 8),
 
-                  // ── Cost + stats row ────────────────────────────
+                  // ── Stats row ──────────────────────────────────
                   Row(
                     children: [
-                      _statChip(
-                        'R${plan.estimatedCostZAR.toStringAsFixed(0)}',
-                        'Total cost',
-                        CLColors.green,
-                      ),
-                      const SizedBox(width: 8),
                       _statChip(
                         '${plan.totalCalories}',
                         'kcal',
@@ -278,12 +313,29 @@ class PlanDetailScreen extends StatelessWidget {
 }
 
 // ── Meal Card ────────────────────────────────────────────────────────────────
-class _MealCard extends StatelessWidget {
+class _MealCard extends StatefulWidget {
   final PlanMeal meal;
   final MealPlan plan;
   final VoidCallback onTap;
   const _MealCard(
       {required this.meal, required this.plan, required this.onTap});
+
+  @override
+  State<_MealCard> createState() => _MealCardState();
+}
+
+class _MealCardState extends State<_MealCard> {
+  late Future<String> _imageFuture;
+
+  PlanMeal get meal => widget.meal;
+  MealPlan get plan => widget.plan;
+  VoidCallback get onTap => widget.onTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageFuture = FoodImageService.getSmartImageUrl(meal.name);
+  }
 
   String get _mealTypeLabel {
     switch (meal.mealType) {
@@ -329,17 +381,31 @@ class _MealCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Emoji
+            // Meal photo
             Container(
-              width: 44,
-              height: 44,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: _mealTypeColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(
-                child: Text(meal.emoji,
-                    style: const TextStyle(fontSize: 22)),
+              clipBehavior: Clip.antiAlias,
+              child: FutureBuilder<String>(
+                future: _imageFuture,
+                builder: (context, snap) {
+                  final url = snap.data ?? FoodImageService.getThumbnailUrl(meal.name);
+                  return CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(
+                      color: _mealTypeColor.withOpacity(0.1),
+                      child: Center(child: Text(meal.emoji, style: const TextStyle(fontSize: 22))),
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      color: _mealTypeColor.withOpacity(0.1),
+                      child: Center(child: Text(meal.emoji, style: const TextStyle(fontSize: 22))),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(width: 12),

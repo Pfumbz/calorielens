@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/meal_plan.dart';
+import '../services/storage_service.dart';
 import '../theme.dart';
 import '../widgets/upgrade_modal.dart';
 import '../screens/plan_detail_screen.dart';
@@ -31,16 +33,9 @@ class GeneratePlanSheet extends StatefulWidget {
 }
 
 class _GeneratePlanSheetState extends State<GeneratePlanSheet> {
-  String _budgetTier = 'r100';
   String _dietary = '';
   bool _loading = false;
   String? _error;
-
-  static const _budgetOptions = [
-    ('r50', 'Budget (R50/day)', '💰'),
-    ('r100', 'Mid-range (R100/day)', '⚖️'),
-    ('r150', 'Premium (R150/day)', '✨'),
-  ];
 
   static const _dietaryOptions = [
     ('', 'No preference'),
@@ -57,17 +52,46 @@ class _GeneratePlanSheetState extends State<GeneratePlanSheet> {
 
     try {
       final profile = state.profile;
-      final profileContext = [
+
+      // Build rich profile context with eating history
+      final profileParts = <String>[
         if (profile.name.isNotEmpty) 'Name: ${profile.name}',
         if (profile.weight > 0) 'Weight: ${profile.weight}kg',
         if (profile.height > 0) 'Height: ${profile.height}cm',
         if (profile.age > 0) 'Age: ${profile.age}',
         if (profile.sex.isNotEmpty) 'Sex: ${profile.sex == "m" ? "Male" : "Female"}',
-      ].join(', ');
+      ];
+
+      // Add country/locale context
+      try {
+        final locale = Platform.localeName;
+        if (locale.contains('ZA') || locale.contains('za')) {
+          profileParts.add('Country: South Africa');
+        } else if (locale.length >= 2) {
+          profileParts.add('Locale: $locale');
+        }
+      } catch (_) {}
+
+      // Add recent eating history (last 3 days of meals)
+      final storage = StorageService();
+      final recentMeals = <String>[];
+      for (int i = 0; i < 3; i++) {
+        final date = DateTime.now().subtract(Duration(days: i));
+        final entries = storage.getDiary(date: date);
+        for (final e in entries) {
+          if (e.name.isNotEmpty) recentMeals.add(e.name);
+        }
+      }
+      if (recentMeals.isNotEmpty) {
+        profileParts.add('Recent meals eaten: ${recentMeals.take(10).join(', ')}');
+        profileParts.add('Please suggest DIFFERENT meals from what they have been eating recently for variety.');
+      }
+
+      final profileContext = profileParts.join('. ');
 
       final result = await state.backend.generateMealPlan(
         calorieGoal: state.calorieGoal,
-        budgetTier: _budgetTier,
+        budgetTier: 'r100',
         dietaryPreference: _dietary.isNotEmpty ? _dietary : null,
         profileContext: profileContext.isNotEmpty ? profileContext : null,
       );
@@ -123,7 +147,7 @@ class _GeneratePlanSheetState extends State<GeneratePlanSheet> {
       name: json['plan_name'] ?? 'Custom Meal Plan',
       description: json['description'] ?? 'AI-generated meal plan tailored to your goals.',
       category: json['category'] ?? 'balanced',
-      budgetTier: json['budget_tier'] ?? _budgetTier,
+      budgetTier: json['budget_tier'] ?? 'r100',
       estimatedCostZAR: (json['estimated_cost_zar'] as num?)?.toDouble() ?? 0,
       totalCalories: (json['total_calories'] as num?)?.toInt() ?? 0,
       totalProtein: (json['total_protein'] as num?)?.toInt() ?? 0,
@@ -217,56 +241,6 @@ class _GeneratePlanSheetState extends State<GeneratePlanSheet> {
             ),
           ),
           const SizedBox(height: 18),
-
-          // Budget selection
-          const Text('Budget',
-              style: TextStyle(
-                  color: CLColors.text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Row(
-            children: _budgetOptions.map((opt) {
-              final (id, label, emoji) = opt;
-              final active = _budgetTier == id;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _budgetTier = id),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: active
-                          ? CLColors.accent.withOpacity(0.12)
-                          : CLColors.surface2,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: active
-                            ? CLColors.accent.withOpacity(0.5)
-                            : CLColors.border,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(emoji, style: const TextStyle(fontSize: 18)),
-                        const SizedBox(height: 4),
-                        Text(
-                          label.split('(')[0].trim(),
-                          style: TextStyle(
-                            color: active ? CLColors.accent : CLColors.muted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
 
           // Dietary preference
           const Text('Dietary preference',

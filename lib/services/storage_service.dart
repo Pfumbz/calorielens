@@ -145,6 +145,10 @@ class StorageService {
   bool get isOnboarded => _prefs.getBool('cl5_onboarded') ?? false;
   Future<void> setOnboarded() => _prefs.setBool('cl5_onboarded', true);
 
+  // ── Cloud migration flag ─────────────────────────────────────────
+  bool get cloudMigrationDone => _prefs.getBool('cl5_cloud_migrated') ?? false;
+  Future<void> setCloudMigrationDone() => _prefs.setBool('cl5_cloud_migrated', true);
+
   // ── Saved meal plans ─────────────────────────────────────────────
   List<String> get savedPlanIds {
     return _prefs.getStringList('cl5_saved_plans') ?? [];

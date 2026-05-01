@@ -20,7 +20,6 @@ class AppState extends ChangeNotifier {
   User? _supabaseUser;
   int _backendScansToday = 0;
   int _backendChatsToday = 0;
-  bool _migrationDone = false; // local → cloud migration flag
 
   // ── Meal plan state ───────────────────────────────────────────────────
   List<String> _savedPlanIds = [];
@@ -89,10 +88,10 @@ class AppState extends ChangeNotifier {
     _supabaseUser = SupabaseService.currentUser;
     if (_supabaseUser == null) return;
 
-    // Migrate local diary data to cloud (one-time)
-    if (!_migrationDone) {
+    // Migrate local diary data to cloud (one-time, persisted)
+    if (!_storage.cloudMigrationDone) {
       await _migrateLocalDataToCloud();
-      _migrationDone = true;
+      await _storage.setCloudMigrationDone();
     }
 
     await _refreshFromCloud();
@@ -323,7 +322,6 @@ class AppState extends ChangeNotifier {
     _supabaseUser = null;
     _backendScansToday = 0;
     _backendChatsToday = 0;
-    _migrationDone = false;
     notifyListeners();
   }
 }

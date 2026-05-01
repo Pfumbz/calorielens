@@ -1,160 +1,194 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/meal_plan.dart';
 import '../models/models.dart';
+import '../services/food_image_service.dart';
 import '../theme.dart';
-import '../widgets/shopping_list_sheet.dart';
 
 /// Detail view for a single meal within a plan.
-/// Shows recipe, ingredients, macros, and a "Shop Ingredients" button.
-class MealDetailScreen extends StatelessWidget {
+/// Shows recipe, ingredients, and macros.
+class MealDetailScreen extends StatefulWidget {
   final PlanMeal meal;
   final MealPlan plan;
   const MealDetailScreen({super.key, required this.meal, required this.plan});
 
   @override
+  State<MealDetailScreen> createState() => _MealDetailScreenState();
+}
+
+class _MealDetailScreenState extends State<MealDetailScreen> {
+  late Future<String> _heroImageFuture;
+
+  PlanMeal get meal => widget.meal;
+  MealPlan get plan => widget.plan;
+
+  @override
+  void initState() {
+    super.initState();
+    _heroImageFuture = FoodImageService.getSmartImageUrl(meal.name, hero: true);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final fallbackUrl = FoodImageService.getHeroUrl(meal.name);
+
     return Scaffold(
       backgroundColor: CLColors.bg,
-      appBar: AppBar(
-        title: Text(meal.name),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 12),
-
-            // ── Hero card ────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    CLColors.accent.withOpacity(0.12),
-                    CLColors.surface,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: CLColors.accent.withOpacity(0.2)),
-              ),
-              child: Column(
+      body: CustomScrollView(
+        slivers: [
+          // ── Hero header with photo ─────────────────────────────
+          SliverAppBar(
+            expandedHeight: 220,
+            pinned: true,
+            backgroundColor: CLColors.bg,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Text(meal.emoji,
-                      style: const TextStyle(fontSize: 48)),
-                  const SizedBox(height: 12),
-                  Text('${meal.calories}',
-                      style: const TextStyle(
-                          color: CLColors.accent,
-                          fontSize: 42,
-                          fontWeight: FontWeight.w800,
-                          height: 1)),
-                  const Text('kcal',
-                      style:
-                          TextStyle(color: CLColors.muted, fontSize: 14)),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _macroChip('Protein', '${meal.protein}g', CLColors.blue),
-                      _macroChip('Carbs', '${meal.carbs}g', CLColors.green),
-                      _macroChip('Fat', '${meal.fat}g', CLColors.accent),
-                    ],
+                  FutureBuilder<String>(
+                    future: _heroImageFuture,
+                    builder: (context, snap) {
+                      final url = snap.data ?? fallbackUrl;
+                      return CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(color: CLColors.surface2),
+                        errorWidget: (_, __, ___) => Container(
+                          color: CLColors.surface2,
+                          child: Center(child: Text(meal.emoji, style: const TextStyle(fontSize: 56))),
+                        ),
+                      );
+                    },
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          CLColors.bg.withOpacity(0.7),
+                          CLColors.bg,
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.2, 0.7, 1.0],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 16,
+                    left: 20,
+                    right: 20,
+                    child: Text(meal.name,
+                        style: const TextStyle(
+                            color: CLColors.text,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+          ),
 
-            // ── Recipe ───────────────────────────────────────────
-            const Text('Recipe',
-                style: TextStyle(
-                    color: CLColors.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: CLColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: CLColors.border),
-              ),
-              child: Text(meal.recipe,
-                  style: const TextStyle(
-                      color: CLColors.text,
-                      fontSize: 14,
-                      height: 1.6)),
-            ),
-            const SizedBox(height: 20),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
 
-            // ── Ingredients ──────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Ingredients',
-                    style: TextStyle(
-                        color: CLColors.text,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-                Text(
-                  '~R${meal.ingredientsCost.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                      color: CLColors.green,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ...meal.ingredients.map((ing) => _ingredientRow(ing)),
-            const SizedBox(height: 20),
+                  // ── Macro summary card ─────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: CLColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: CLColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        Text('${meal.calories}',
+                            style: const TextStyle(
+                                color: CLColors.accent,
+                                fontSize: 42,
+                                fontWeight: FontWeight.w800,
+                                height: 1)),
+                        const Text('kcal',
+                            style: TextStyle(color: CLColors.muted, fontSize: 14)),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _macroChip('Protein', '${meal.protein}g', CLColors.blue),
+                            _macroChip('Carbs', '${meal.carbs}g', CLColors.green),
+                            _macroChip('Fat', '${meal.fat}g', CLColors.accent),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
-            // ── Action buttons ───────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => showShoppingListSheet(
-                  context,
-                  ingredients: meal.ingredients,
-                  budgetTier: plan.budgetTier,
-                ),
-                icon: const Icon(Icons.shopping_cart_outlined, size: 18),
-                label: const Text('SHOP INGREDIENTS'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
+                  // ── Recipe ───────────────────────────────────────────
+                  const Text('Recipe',
+                      style: TextStyle(
+                          color: CLColors.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: CLColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: CLColors.border),
+                    ),
+                    child: Text(meal.recipe,
+                        style: const TextStyle(
+                            color: CLColors.text,
+                            fontSize: 14,
+                            height: 1.6)),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Ingredients ──────────────────────────────────────
+                  const Text('Ingredients',
+                      style: TextStyle(
+                          color: CLColors.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 10),
+                  ...meal.ingredients.map((ing) => _ingredientRow(ing)),
+                  const SizedBox(height: 20),
+
+                  // ── Log to diary button ─────────────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _logMeal(context),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('LOG TO DIARY'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CLColors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _logMeal(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('LOG TO DIARY'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: CLColors.green,
-                  side: const BorderSide(color: CLColors.green),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -204,11 +238,6 @@ class MealDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          Text('~R${ing.estimatedPriceZAR.toStringAsFixed(0)}',
-              style: const TextStyle(
-                  color: CLColors.green,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600)),
         ],
       ),
     );

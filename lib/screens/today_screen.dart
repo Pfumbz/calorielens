@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
@@ -102,72 +103,102 @@ class TodayScreen extends StatelessWidget {
   Widget _buildCalorieRing(BuildContext context, AppState state) {
     final used = state.totalCalories;
     final goal = state.calorieGoal;
-    final pct  = (used / goal).clamp(0.0, 1.0);
-    final left = (goal - used);
-    final color = left < 0
+    final pct  = goal > 0 ? (used / goal).clamp(0.0, 1.5) : 0.0;
+    final left = goal - used;
+    final isOver = left < 0;
+    final ringColor = isOver
         ? CLColors.red
         : left < goal * 0.1
             ? CLColors.accent
             : CLColors.green;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       decoration: BoxDecoration(
         color: CLColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: CLColors.border),
       ),
-      child: Row(
+      child: Column(
         children: [
+          // ── Ring with centre text ──
           SizedBox(
-            width: 100,
-            height: 100,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.0, end: pct),
-                  duration: const Duration(milliseconds: 800),
-                  builder: (_, v, __) => CircularProgressIndicator(
-                    value: v,
-                    strokeWidth: 9,
-                    backgroundColor: CLColors.border,
-                    valueColor: AlwaysStoppedAnimation(color),
-                  ),
+            width: 160,
+            height: 160,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: pct.clamp(0.0, 1.0)),
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeOutCubic,
+              builder: (_, animVal, child) => CustomPaint(
+                painter: _CalorieRingPainter(
+                  progress: animVal,
+                  ringColor: ringColor,
+                  trackColor: CLColors.border,
+                  strokeWidth: 12,
                 ),
-                Column(
+                child: child,
+              ),
+              child: Center(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('$used', style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.w700, height: 1)),
-                    const Text('eaten', style: TextStyle(color: CLColors.muted, fontSize: 10)),
+                    Text(
+                      '${left.abs()}',
+                      style: TextStyle(
+                        color: ringColor,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
+                    Text(
+                      isOver ? 'kcal over' : 'kcal left',
+                      style: const TextStyle(
+                        color: CLColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _statRow('Goal', '$goal kcal', CLColors.muted),
-                const SizedBox(height: 8),
-                _statRow('Consumed', '$used kcal', CLColors.text),
-                const SizedBox(height: 8),
-                _statRow(left < 0 ? 'Over by' : 'Remaining', '${left.abs()} kcal', color),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () => _showGoalEditor(context, context.read<AppState>()),
-                  child: Text('Edit goal', style: TextStyle(color: CLColors.accent.withOpacity(0.8), fontSize: 11, decoration: TextDecoration.underline)),
-                ),
-              ],
-            ),
+          const SizedBox(height: 20),
+          // ── Stats row beneath the ring ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _ringStatCol('Eaten', '$used', CLColors.text),
+              Container(width: 1, height: 28, color: CLColors.border),
+              _ringStatCol('Goal', '$goal', CLColors.muted),
+              Container(width: 1, height: 28, color: CLColors.border),
+              GestureDetector(
+                onTap: () => _showGoalEditor(context, context.read<AppState>()),
+                child: _ringStatCol('Edit', 'goal', CLColors.accent),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
+  Widget _ringStatCol(String label, String value, Color valueColor) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value,
+            style: TextStyle(
+                color: valueColor, fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 2),
+        Text(label,
+            style: const TextStyle(color: CLColors.muted, fontSize: 11)),
+      ],
+    );
+  }
+
+  // Keep this for other uses
   Widget _statRow(String label, String value, Color color) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -486,4 +517,57 @@ class TodayScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Custom ring painter with rounded stroke caps ─────────────────────────────
+class _CalorieRingPainter extends CustomPainter {
+  final double progress;
+  final Color ringColor;
+  final Color trackColor;
+  final double strokeWidth;
+
+  _CalorieRingPainter({
+    required this.progress,
+    required this.ringColor,
+    required this.trackColor,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centre = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    const startAngle = -math.pi / 2; // 12 o'clock
+    final sweepAngle = 2 * math.pi * progress;
+
+    // Track (background ring)
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(centre, radius, trackPaint);
+
+    // Progress arc
+    if (progress > 0) {
+      final arcPaint = Paint()
+        ..color = ringColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: centre, radius: radius),
+        startAngle,
+        sweepAngle,
+        false,
+        arcPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CalorieRingPainter old) =>
+      old.progress != progress || old.ringColor != ringColor;
 }
