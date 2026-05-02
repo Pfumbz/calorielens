@@ -26,7 +26,7 @@ class UpgradeModal extends StatelessWidget {
   String get _contextMessage {
     switch (source) {
       case 'scan_limit':
-        return "You've used all 3 free scans for today. Upgrade to Pro for unlimited daily scans — never miss logging a meal.";
+        return "You've used all 5 free scans for today. Upgrade to Pro for up to 50 scans/day — never miss logging a meal.";
       case 'week_report':
         return "The Weekly Progress Report is a Pro feature. Unlock your full 7-day analysis with trends and AI insights.";
       case 'budget_coach':
@@ -172,12 +172,13 @@ class UpgradeModal extends StatelessWidget {
   }
 
   static const _features = [
-    'Unlimited meal scans — no daily cap',
+    'Up to 50 meal scans per day',
     'AI-generated personalised meal plans',
     'Fridge Scanner — snap & get recipe ideas',
     'AI Budget Coach — "What can I eat right now?"',
     'Weekly Progress Report — full 7-day analysis',
     'Unlimited AI Coach with full history',
+    'No ads',
   ];
 }
 

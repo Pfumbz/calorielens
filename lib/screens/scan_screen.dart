@@ -9,7 +9,7 @@ import '../services/openfoodfacts_service.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
 import '../widgets/upgrade_modal.dart';
-import 'settings_screen.dart';
+
 
 enum _ScanMode { photo, text, barcode }
 
@@ -289,13 +289,7 @@ class _ScanScreenState extends State<ScanScreen>
                 ),
               ),
             const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const SettingsScreen()),
-              ),
-              child: Container(
+            Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -323,9 +317,9 @@ class _ScanScreenState extends State<ScanScreen>
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      (state.isPremium || state.hasApiKey)
+                      state.hasApiKey
                           ? 'Unlimited'
-                          : state.isSignedIn
+                          : (state.isPremium || state.isSignedIn)
                               ? '${state.scansRemainingToday} left'
                               : 'Guest',
                       style: TextStyle(
@@ -336,7 +330,6 @@ class _ScanScreenState extends State<ScanScreen>
                   ],
                 ),
               ),
-            ),
           ],
         ),
       ],
@@ -875,8 +868,8 @@ class _ScanScreenState extends State<ScanScreen>
   // ── SCAN LIMIT BAR ──────────────────────────────────────────────────────────
   Widget _buildScanLimit(AppState state) {
     // Hide for premium/BYOK users
-    final total = state.hasApiKey || state.isPremium ? 999 : state.isSignedIn ? 10 : 3;
-    if (total >= 999) return const SizedBox.shrink();
+    if (state.hasApiKey) return const SizedBox.shrink(); // BYOK = no limit bar
+    final total = state.isPremium ? 50 : state.isSignedIn ? 5 : 3;
     final left = state.scansRemainingToday;
     final used = (total - left).clamp(0, total);
     final pct = used / total;

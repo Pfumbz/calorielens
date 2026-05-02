@@ -34,10 +34,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- AdMob App ID (using Google test ID — replace with real ID for production) -->
+        <!-- AdMob App ID — using test ID until app is on Play Store -->
+        <!-- Production: ca-app-pub-5237846834490979~1166433546 -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-5237846834490979~1166433546" />
+            android:value="ca-app-pub-3940256099942544~3347511713" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

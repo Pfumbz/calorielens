@@ -45,18 +45,25 @@ class AppState extends ChangeNotifier {
   int get caloriesLeft  => (_calorieGoal - totalCalories).clamp(0, 9999);
   bool get hasApiKey    => _apiKey.isNotEmpty;
 
-  /// Remaining free AI scans today (shown in UI).
+  // Scan limits per tier
+  static const int _guestScanLimit = 3;
+  static const int _freeScanLimit = 5;
+  static const int _proScanLimit = 50;
+
+  /// Remaining AI scans today (shown in UI).
   int get scansRemainingToday {
-    if (_apiKey.isNotEmpty || _isPremium) return 999;
-    if (isSignedIn) return (10 - _backendScansToday).clamp(0, 10);
-    return (3 - _storage.scanCountToday).clamp(0, 3);
+    if (_apiKey.isNotEmpty) return 999; // BYOK = unlimited
+    if (_isPremium) return (_proScanLimit - _backendScansToday).clamp(0, _proScanLimit);
+    if (isSignedIn) return (_freeScanLimit - _backendScansToday).clamp(0, _freeScanLimit);
+    return (_guestScanLimit - _storage.scanCountToday).clamp(0, _guestScanLimit);
   }
 
   /// Whether the user can attempt a scan right now.
   /// Note: backend enforces the real limit (429 response). This is for UI gating.
   bool get canScan {
-    if (_apiKey.isNotEmpty || _isPremium) return true;
-    if (isSignedIn) return _backendScansToday < 10;
+    if (_apiKey.isNotEmpty) return true; // BYOK = unlimited
+    if (_isPremium) return _backendScansToday < _proScanLimit;
+    if (isSignedIn) return _backendScansToday < _freeScanLimit;
     return _storage.canScan; // local 3/day for guests
   }
 

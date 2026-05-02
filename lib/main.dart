@@ -11,6 +11,7 @@ import 'screens/scan_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/coach_screen.dart';
 import 'screens/meal_plans_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/auth/login_screen.dart';
 
 void main() async {
@@ -23,21 +24,18 @@ void main() async {
     ),
   );
 
-  // Initialize local storage
+  // Initialize local storage first (needed by AppState)
   await StorageService().init();
 
-  // Initialize Supabase (will no-op gracefully if credentials are placeholders)
-  try {
-    await SupabaseService.initialize();
-  } catch (_) {
-    // Supabase not configured yet — app runs in guest-only mode
-  }
-
-  // Initialize local notifications
-  await NotificationService.init();
-
-  // Initialize Google Mobile Ads
-  await MobileAds.instance.initialize();
+  // Run remaining inits in parallel for faster startup
+  await Future.wait([
+    // Supabase (no-ops gracefully if credentials are placeholders)
+    SupabaseService.initialize().catchError((_) {}),
+    // Local notifications
+    NotificationService.init(),
+    // Google Mobile Ads
+    MobileAds.instance.initialize(),
+  ]);
 
   runApp(
     ChangeNotifierProvider(
@@ -88,8 +86,8 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _ctrl.forward();
 
-    // Navigate to shell after 2.4s
-    Future.delayed(const Duration(milliseconds: 2400), () {
+    // Navigate to shell after 1.4s
+    Future.delayed(const Duration(milliseconds: 1400), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
@@ -246,6 +244,7 @@ class _AppShellState extends State<AppShell> {
     TodayScreen(),
     CoachScreen(),
     MealPlansScreen(),
+    SettingsScreen(),
   ];
 
   static const _navItems = [
@@ -268,6 +267,11 @@ class _AppShellState extends State<AppShell> {
       icon: Icon(Icons.restaurant_menu_outlined),
       activeIcon: Icon(Icons.restaurant_menu),
       label: 'Meals',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.settings_outlined),
+      activeIcon: Icon(Icons.settings),
+      label: 'Settings',
     ),
   ];
 

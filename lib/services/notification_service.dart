@@ -1,9 +1,10 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 
 /// Handles local push notifications for meal reminders and coaching nudges.
 ///
@@ -38,7 +39,9 @@ class NotificationService {
   static Future<void> init() async {
     if (_initialised) return;
 
-    tz.initializeTimeZones();
+    // Initialize timezone database and set local timezone
+    tzdata.initializeTimeZones();
+    _setLocalTimezone();
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
@@ -52,6 +55,40 @@ class NotificationService {
     );
 
     _initialised = true;
+
+    // Auto-schedule reminders if they were previously enabled
+    if (await remindersEnabled) {
+      await scheduleAllMealReminders();
+    }
+  }
+
+  /// Set the local timezone from the device's UTC offset.
+  static void _setLocalTimezone() {
+    try {
+      final now = DateTime.now();
+      final offset = now.timeZoneOffset;
+
+      // Try to find a timezone matching the device's offset
+      // Common South Africa timezone
+      if (offset.inHours == 2) {
+        tz.setLocalLocation(tz.getLocation('Africa/Johannesburg'));
+      } else {
+        // Fallback: find any timezone with matching offset
+        final locations = tz.timeZoneDatabase.locations;
+        for (final loc in locations.values) {
+          final tzNow = tz.TZDateTime.now(loc);
+          if (tzNow.timeZoneOffset == offset) {
+            tz.setLocalLocation(loc);
+            return;
+          }
+        }
+        // Last resort: use UTC
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      }
+    } catch (e) {
+      debugPrint('NotificationService: failed to set timezone: $e');
+      tz.setLocalLocation(tz.getLocation('UTC'));
+    }
   }
 
   // ── Request permission (Android 13+) ──────────────────────────────────────
@@ -60,9 +97,30 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
       final granted = await android.requestNotificationsPermission();
+      // Also request exact alarm permission for scheduled notifications
+      await android.requestExactAlarmsPermission();
       return granted ?? false;
     }
     return true; // iOS handles via DarwinInitializationSettings
+  }
+
+  // ── Send a test notification immediately ──────────────────────────────────
+  static Future<void> sendTestNotification() async {
+    await _plugin.show(
+      999,
+      'CalorieLens is working! 🎉',
+      'Notifications are set up correctly.',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDesc,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+    );
   }
 
   // ── Preferences ───────────────────────────────────────────────────────────
@@ -185,25 +243,81 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduled,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
-          importance: Importance.high,
-          priority: Priority.defaultPriority,
-          icon: '@mipmap/ic_launcher',
+    debugPrint('NotificationService: Scheduling $meal (#$id) for $scheduled (now=$now)');
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduled,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDesc,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
         ),
-      ),
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time, // repeats daily
-    );
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
+        matchDateTimeComponents: DateTimeComponents.time, // repeats daily
+      );
+      debugPrint('NotificationService: ✅ $meal scheduled successfully');
+    } catch (e) {
+      debugPrint('NotificationService: ❌ Failed to schedule $meal: $e');
+    }
+  }
+
+  /// Schedule a test notification 30 seconds from now using alarmClock mode
+  static Future<void> sendScheduledTest() async {
+    final testTime = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 30));
+    debugPrint('NotificationService: Scheduling test for $testTime (local=${tz.local.name})');
+
+    // Try alarmClock mode first (most reliable on modern Android)
+    try {
+      await _plugin.zonedSchedule(
+        998,
+        'Scheduled test worked! ⏰',
+        'This was scheduled 30 seconds ago using alarmClock mode.',
+        testTime,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDesc,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+        ),
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
+      );
+      debugPrint('NotificationService: ✅ alarmClock test scheduled');
+    } catch (e) {
+      debugPrint('NotificationService: ❌ alarmClock failed: $e — falling back to delayed show()');
+      // Fallback: use Future.delayed + show() which we know works
+      Future.delayed(const Duration(seconds: 30), () {
+        _plugin.show(
+          998,
+          'Scheduled test worked! ⏰',
+          'This used the fallback timer method.',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId,
+              _channelName,
+              channelDescription: _channelDesc,
+              importance: Importance.high,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+            ),
+          ),
+        );
+      });
+    }
   }
 
   static Future<void> cancelMealReminders() async {
@@ -253,25 +367,21 @@ class NotificationService {
     }
 
     if (title != null && body != null) {
-      // Schedule 1 minute from now (so it appears shortly)
-      final nudgeTime = tz.TZDateTime.now(tz.local).add(const Duration(minutes: 1));
-      await _plugin.zonedSchedule(
+      // Show nudge immediately (triggered by app usage, no need to schedule)
+      await _plugin.show(
         _nudgeId,
         title,
         body,
-        nudgeTime,
-        NotificationDetails(
+        const NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
             _channelName,
             channelDescription: _channelDesc,
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
+            importance: Importance.high,
+            priority: Priority.high,
             icon: '@mipmap/ic_launcher',
           ),
         ),
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       );
     }
   }

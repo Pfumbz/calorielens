@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const FREE_SCAN_LIMIT = 10
+const FREE_SCAN_LIMIT = 5  // scans per day for free users
+const PRO_SCAN_LIMIT = 50  // scans per day for Pro users
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -36,25 +37,24 @@ serve(async (req) => {
 
     const isPremium = profile?.is_premium ?? false
     const today = new Date().toISOString().split('T')[0]
+    const scanLimit = isPremium ? PRO_SCAN_LIMIT : FREE_SCAN_LIMIT
 
-    if (!isPremium) {
-      const { data: usage } = await supabase
-        .from('usage')
-        .select('scan_count')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single()
+    const { data: usage } = await supabase
+      .from('usage')
+      .select('scan_count')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .single()
 
-      const scanCount = usage?.scan_count ?? 0
-      if (scanCount >= FREE_SCAN_LIMIT) {
-        return new Response(
-          JSON.stringify({
-            error: `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for unlimited scanning.`,
-            code: 'SCAN_LIMIT_REACHED',
-          }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    const scanCount = usage?.scan_count ?? 0
+    if (scanCount >= scanLimit) {
+      const message = isPremium
+        ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
+        : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
+      return new Response(
+        JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const { description } = await req.json()

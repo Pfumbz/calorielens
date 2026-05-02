@@ -141,9 +141,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 _usagePill(
                   icon: Icons.camera_alt_outlined,
-                  label: state.isPremium || state.hasApiKey
+                  label: state.hasApiKey
                       ? 'Unlimited scans'
-                      : '$scansLeft scans left today',
+                      : state.isPremium
+                          ? '$scansLeft of 50 scans left'
+                          : '$scansLeft scans left today',
                   color: scansLeft > 3 || state.isPremium || state.hasApiKey
                       ? CLColors.green
                       : CLColors.gold,
@@ -246,7 +248,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: const TextStyle(color: CLColors.text, fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                     Text(
-                      isPro ? 'All features unlocked' : '3 scans/day · limited features',
+                      isPro ? 'All features unlocked' : '5 scans/day · limited features',
                       style: const TextStyle(color: CLColors.muted, fontSize: 11),
                     ),
                   ],
@@ -270,10 +272,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          ..._featureRow('Unlimited meal scans', isPro),
+          ..._featureRow('Up to 50 meal scans/day', isPro),
           ..._featureRow('AI Budget Coach', isPro),
           ..._featureRow('Weekly Progress Report', isPro),
           ..._featureRow('Unlimited AI Coach history', isPro),
+          ..._featureRow('No ads', isPro),
           const SizedBox(height: 14),
           if (!isPro)
             SizedBox(
@@ -295,7 +298,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (_) => AlertDialog(
                     backgroundColor: CLColors.surface,
                     title: const Text('Cancel Pro?', style: TextStyle(color: CLColors.text)),
-                    content: const Text('You will return to the free tier with 3 scans/day.', style: TextStyle(color: CLColors.muted)),
+                    content: const Text('You will return to the free tier with 5 scans/day and ads.', style: TextStyle(color: CLColors.muted)),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep Pro')),
                       TextButton(
