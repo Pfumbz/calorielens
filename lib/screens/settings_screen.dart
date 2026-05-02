@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../app_state.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
@@ -86,6 +87,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildRemindersSection(context),
             const SizedBox(height: 20),
             _buildAdvancedToggle(context, state),
+            const SizedBox(height: 20),
+            _buildAboutSection(),
             const SizedBox(height: 80),
           ],
         ),
@@ -643,6 +646,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ── About / Legal ───────────────────────────────────────────────────────────
+  static const _privacyPolicyUrl = 'https://pfumbz.github.io/calorielens/privacy-policy.html';
+
+  Widget _buildAboutSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('About',
+            style: TextStyle(color: CLColors.text, fontSize: 15, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        _aboutTile(
+          icon: Icons.privacy_tip_outlined,
+          label: 'Privacy Policy',
+          onTap: () => launchUrl(Uri.parse(_privacyPolicyUrl), mode: LaunchMode.externalApplication),
+        ),
+        _aboutTile(
+          icon: Icons.mail_outline,
+          label: 'Contact Us',
+          onTap: () => launchUrl(Uri.parse('mailto:makhuvhap.c@gmail.com')),
+        ),
+        const SizedBox(height: 16),
+        const Center(
+          child: Text(
+            'CalorieLens v1.0.0 · PC Mac Studios',
+            style: TextStyle(color: CLColors.muted, fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _aboutTile({required IconData icon, required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: CLColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: CLColors.muted, size: 18),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: const TextStyle(color: CLColors.text, fontSize: 13))),
+            const Icon(Icons.chevron_right, color: CLColors.muted, size: 18),
+          ],
+        ),
+      ),
     );
   }
 }

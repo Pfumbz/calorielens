@@ -126,21 +126,6 @@ class StorageService {
     await _prefs.setInt(k, glasses);
   }
 
-  // ── Workout streak ────────────────────────────────────────────────
-  int get workoutStreak => _prefs.getInt('cl5_wo_streak') ?? 0;
-  Future<void> saveWorkoutStreak(int v) => _prefs.setInt('cl5_wo_streak', v);
-
-  // ── Steps ─────────────────────────────────────────────────────────
-  int get stepsToday {
-    final k = 'cl5_steps_${_dateKey(DateTime.now())}';
-    return _prefs.getInt(k) ?? 0;
-  }
-
-  Future<void> saveSteps(int steps) async {
-    final k = 'cl5_steps_${_dateKey(DateTime.now())}';
-    await _prefs.setInt(k, steps);
-  }
-
   // ── Onboarded ─────────────────────────────────────────────────────
   bool get isOnboarded => _prefs.getBool('cl5_onboarded') ?? false;
   Future<void> setOnboarded() => _prefs.setBool('cl5_onboarded', true);
