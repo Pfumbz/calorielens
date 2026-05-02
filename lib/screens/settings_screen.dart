@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../theme.dart';
 import '../utils/pricing.dart';
 import '../widgets/upgrade_modal.dart';
@@ -23,6 +24,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _keyVisible  = false;
   bool _showAdvanced = false;
 
+  // Notification state
+  bool _remindersOn = false;
+  bool _nudgesOn = false;
+  TimeOfDay _breakfastTime = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay _lunchTime = const TimeOfDay(hour: 12, minute: 30);
+  TimeOfDay _dinnerTime = const TimeOfDay(hour: 18, minute: 30);
+
   @override
   void initState() {
     super.initState();
@@ -32,6 +40,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _ageCtrl.text    = state.profile.age > 0 ? '${state.profile.age}' : '';
     _weightCtrl.text = state.profile.weight > 0 ? '${state.profile.weight}' : '';
     _heightCtrl.text = state.profile.height > 0 ? '${state.profile.height}' : '';
+    _loadNotificationPrefs();
+  }
+
+  Future<void> _loadNotificationPrefs() async {
+    final remOn = await NotificationService.remindersEnabled;
+    final nudOn = await NotificationService.nudgesEnabled;
+    final bTime = await NotificationService.getReminderTime('breakfast');
+    final lTime = await NotificationService.getReminderTime('lunch');
+    final dTime = await NotificationService.getReminderTime('dinner');
+    if (mounted) {
+      setState(() {
+        _remindersOn = remOn;
+        _nudgesOn = nudOn;
+        _breakfastTime = bTime;
+        _lunchTime = lTime;
+        _dinnerTime = dTime;
+      });
+    }
   }
 
   @override
@@ -56,6 +82,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildPremiumCard(context, state),
             const SizedBox(height: 20),
             _buildProfileSection(context, state),
+            const SizedBox(height: 20),
+            _buildRemindersSection(context),
             const SizedBox(height: 20),
             _buildAdvancedToggle(context, state),
             const SizedBox(height: 80),
@@ -367,6 +395,164 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Text('💡 BYOK: ~\$0.001 per scan/message (Claude Haiku). Get a key at console.anthropic.com',
             style: TextStyle(color: CLColors.muted, fontSize: 11, height: 1.4)),
       ],
+    );
+  }
+
+  Widget _buildRemindersSection(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('🔔  Reminders & Nudges',
+              style: TextStyle(color: CLColors.text, fontSize: 15, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          const Text('Get reminded to log meals and stay on track.',
+              style: TextStyle(color: CLColors.muted, fontSize: 11)),
+          const SizedBox(height: 14),
+
+          // Meal reminders toggle
+          _reminderToggle(
+            label: 'Meal reminders',
+            subtitle: 'Daily reminders to log breakfast, lunch, and dinner',
+            value: _remindersOn,
+            onChanged: (val) async {
+              final granted = await NotificationService.requestPermission();
+              if (!granted && val) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enable notifications in your device settings'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+                return;
+              }
+              setState(() => _remindersOn = val);
+              await NotificationService.setRemindersEnabled(val);
+            },
+          ),
+
+          // Time pickers (only shown when reminders are on)
+          if (_remindersOn) ...[
+            const SizedBox(height: 10),
+            _timePicker('Breakfast', _breakfastTime, (t) async {
+              setState(() => _breakfastTime = t);
+              await NotificationService.setReminderTime('breakfast', t);
+            }),
+            _timePicker('Lunch', _lunchTime, (t) async {
+              setState(() => _lunchTime = t);
+              await NotificationService.setReminderTime('lunch', t);
+            }),
+            _timePicker('Dinner', _dinnerTime, (t) async {
+              setState(() => _dinnerTime = t);
+              await NotificationService.setReminderTime('dinner', t);
+            }),
+          ],
+
+          const Divider(color: CLColors.border, height: 24),
+
+          // Coaching nudges toggle
+          _reminderToggle(
+            label: 'Coaching nudges',
+            subtitle: 'Smart tips based on your daily progress and water intake',
+            value: _nudgesOn,
+            onChanged: (val) async {
+              final granted = await NotificationService.requestPermission();
+              if (!granted && val) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enable notifications in your device settings'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+                return;
+              }
+              setState(() => _nudgesOn = val);
+              await NotificationService.setNudgesEnabled(val);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reminderToggle({
+    required String label,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(color: CLColors.text, fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(subtitle,
+                  style: const TextStyle(color: CLColors.muted, fontSize: 11)),
+            ],
+          ),
+        ),
+        Switch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: CLColors.accent,
+          inactiveTrackColor: CLColors.border,
+        ),
+      ],
+    );
+  }
+
+  Widget _timePicker(String meal, TimeOfDay time, ValueChanged<TimeOfDay> onChanged) {
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showTimePicker(
+          context: context,
+          initialTime: time,
+          builder: (ctx, child) => Theme(
+            data: ThemeData.dark().copyWith(
+              colorScheme: const ColorScheme.dark(
+                primary: CLColors.accent,
+                surface: CLColors.surface,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+        if (picked != null) onChanged(picked);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: CLColors.bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Text(meal,
+                style: const TextStyle(color: CLColors.text, fontSize: 13)),
+            const Spacer(),
+            Text(
+              time.format(context),
+              style: const TextStyle(color: CLColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.access_time, color: CLColors.muted, size: 16),
+          ],
+        ),
+      ),
     );
   }
 

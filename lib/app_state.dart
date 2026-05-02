@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'models/models.dart';
+import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'services/supabase_service.dart';
 import 'services/backend_service.dart';
@@ -79,6 +80,13 @@ class AppState extends ChangeNotifier {
     if (_supabaseUser != null) {
       await _refreshFromCloud();
     }
+
+    // Check if coaching nudge should fire on app open
+    unawaited(NotificationService.checkAndScheduleNudge(
+      caloriesEaten: totalCalories,
+      calorieGoal: _calorieGoal,
+      waterGlasses: _water,
+    ));
 
     notifyListeners();
   }
@@ -210,6 +218,13 @@ class AppState extends ChangeNotifier {
         fiberG: entry.fiber,
       ));
     }
+
+    // Check if a coaching nudge should be scheduled
+    unawaited(NotificationService.checkAndScheduleNudge(
+      caloriesEaten: totalCalories,
+      calorieGoal: _calorieGoal,
+      waterGlasses: _water,
+    ));
 
     notifyListeners();
   }

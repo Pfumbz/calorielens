@@ -41,8 +41,12 @@ dependencies:
   supabase_flutter: ^2.5.0
   google_sign_in: ^6.2.1
 
-  # URL launching (for retailer deep links)
+  # URL launching
   url_launcher: ^6.2.5
+
+  # Local notifications (meal reminders & coaching nudges)
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
 
 dev_dependencies:
   flutter_test:

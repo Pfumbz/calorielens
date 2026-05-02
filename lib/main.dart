@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'services/supabase_service.dart';
 import 'theme.dart';
@@ -30,6 +31,9 @@ void main() async {
   } catch (_) {
     // Supabase not configured yet — app runs in guest-only mode
   }
+
+  // Initialize local notifications
+  await NotificationService.init();
 
   runApp(
     ChangeNotifierProvider(
