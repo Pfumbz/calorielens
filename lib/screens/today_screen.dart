@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/models.dart';
 import '../theme.dart';
+import '../widgets/ad_banner.dart';
 import 'history_screen.dart';
 import 'trends_screen.dart';
 
@@ -30,6 +31,8 @@ class TodayScreen extends StatelessWidget {
               _buildWaterTracker(context, state),
               const SizedBox(height: 12),
               _buildTrendsButton(context),
+              // Ad banner (hidden for Pro/BYOK users via AdBanner)
+              const AdBanner(),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

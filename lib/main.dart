@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 import 'package:provider/provider.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
@@ -34,6 +35,9 @@ void main() async {
 
   // Initialize local notifications
   await NotificationService.init();
+
+  // Initialize Google Mobile Ads
+  await MobileAds.instance.initialize();
 
   runApp(
     ChangeNotifierProvider(

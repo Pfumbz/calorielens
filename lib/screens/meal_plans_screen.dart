@@ -6,6 +6,7 @@ import '../data/meal_plans.dart';
 import '../models/meal_plan.dart';
 import '../services/food_image_service.dart';
 import '../theme.dart';
+import '../widgets/ad_banner.dart';
 import '../widgets/generate_plan_sheet.dart';
 import '../widgets/upgrade_modal.dart';
 import 'fridge_scan_screen.dart';
@@ -94,6 +95,11 @@ class _MealPlansScreenState extends State<MealPlansScreen> {
                   ],
                 ),
               ),
+            ),
+
+            // ── Ad banner ────────────────────────────────────
+            const SliverToBoxAdapter(
+              child: AdBanner(),
             ),
 
             // ── Category chips ───────────────────────────────
