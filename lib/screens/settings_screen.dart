@@ -139,7 +139,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ── ACCOUNT SECTION ────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildAccountSection(AppState state) {
-    final isSignedIn = state.isSignedIn;
+    final isRealUser = state.isRealUser; // excludes anonymous guests
     final user = state.supabaseUser;
     final scansLeft = state.scansRemainingToday;
 
@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isSignedIn
+                        isRealUser
                             ? (state.profile.name.isNotEmpty
                                 ? state.profile.name
                                 : 'User')
@@ -188,7 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        isSignedIn
+                        isRealUser
                             ? (user?.email ?? 'Signed in')
                             : 'Sign in for cloud sync & more scans',
                         style: const TextStyle(
@@ -197,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
-                if (isSignedIn)
+                if (isRealUser)
                   const Icon(Icons.chevron_right,
                       color: CLColors.muted, size: 20),
               ],
@@ -205,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           // Scans left row
-          if (isSignedIn) ...[
+          if (state.isSignedIn) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Row(
@@ -230,7 +230,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? 'Unlimited'
                         : state.isPremium
                             ? '$scansLeft of 50'
-                            : '$scansLeft of 5',
+                            : state.isAnonymous
+                                ? '$scansLeft of 3'
+                                : '$scansLeft of 5',
                     style: TextStyle(
                       color: (scansLeft > 3 || state.isPremium || state.hasApiKey)
                           ? CLColors.green
@@ -248,7 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(color: CLColors.border, height: 1),
 
           // Sign in / Sign out row
-          if (!isSignedIn)
+          if (!isRealUser)
             _tappableRow(
               icon: Icons.login,
               label: 'Sign in / Create account',

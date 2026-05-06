@@ -183,9 +183,9 @@ class _SplashScreenState extends State<SplashScreen>
 
 // ─── AUTH GATE ────────────────────────────────────────────────────────────────
 /// Listens to Supabase auth state and routes accordingly.
-/// • Signed in → AppShell (full access)
+/// • Signed in (real or anonymous) → AppShell
 /// • Not signed in → LoginScreen (with "Continue as Guest")
-/// • Guest tapped → AppShell (local-only mode, 3 scans/day)
+/// • Guest tapped → anonymous sign-in → AppShell (3 scans/day)
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -194,14 +194,19 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  bool _guestMode = false;
   bool _signInHandled = false;
+
+  Future<void> _handleGuestMode() async {
+    try {
+      await SupabaseService.signInAnonymously();
+      // The auth stream will pick up the new session and route to AppShell
+    } catch (e) {
+      debugPrint('Anonymous sign-in failed: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Guest chose to skip sign-in — go straight to the app
-    if (_guestMode) return const AppShell();
-
     return StreamBuilder(
       stream: SupabaseService.authStateChanges,
       builder: (context, snapshot) {
@@ -226,9 +231,9 @@ class _AuthGateState extends State<AuthGate> {
         // User signed out — reset guard so next sign-in triggers sync
         _signInHandled = false;
 
-        // Show login screen — pass callback so "Continue as Guest" works
+        // Show login screen — guest callback triggers anonymous sign-in
         return LoginScreen(
-          onContinueAsGuest: () => setState(() => _guestMode = true),
+          onContinueAsGuest: _handleGuestMode,
         );
       },
     );

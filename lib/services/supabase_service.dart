@@ -32,7 +32,19 @@ class SupabaseService {
   static User? get currentUser => client.auth.currentUser;
   static Session? get currentSession => client.auth.currentSession;
   static bool get isSignedIn => currentUser != null;
+
+  /// True if the current user is an anonymous (guest) session.
+  static bool get isAnonymous => currentUser?.isAnonymous ?? false;
+
+  /// True if the user is signed in with a real account (not anonymous).
+  static bool get isRealUser => isSignedIn && !isAnonymous;
+
   static Stream<AuthState> get authStateChanges => client.auth.onAuthStateChange;
+
+  /// Sign in anonymously — gives guests a real JWT for Edge Function access.
+  static Future<void> signInAnonymously() async {
+    await client.auth.signInAnonymously();
+  }
 
   // ── Profile helpers ──────────────────────────────────────────────────────
   /// Fetch the current user's profile row (returns null if not found).

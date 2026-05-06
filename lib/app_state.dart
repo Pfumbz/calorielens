@@ -34,6 +34,8 @@ class AppState extends ChangeNotifier {
   String get apiKey => _apiKey;
   User? get supabaseUser => _supabaseUser;
   bool get isSignedIn => _supabaseUser != null;
+  bool get isAnonymous => SupabaseService.isAnonymous;
+  bool get isRealUser => SupabaseService.isRealUser;
 
   List<String> get savedPlanIds => _savedPlanIds;
   bool isPlanSaved(String planId) => _savedPlanIds.contains(planId);
@@ -54,8 +56,9 @@ class AppState extends ChangeNotifier {
   int get scansRemainingToday {
     if (_apiKey.isNotEmpty) return 999; // BYOK = unlimited
     if (_isPremium) return (_proScanLimit - _backendScansToday).clamp(0, _proScanLimit);
+    if (isAnonymous) return (_guestScanLimit - _backendScansToday).clamp(0, _guestScanLimit);
     if (isSignedIn) return (_freeScanLimit - _backendScansToday).clamp(0, _freeScanLimit);
-    return (_guestScanLimit - _storage.scanCountToday).clamp(0, _guestScanLimit);
+    return 0; // not signed in at all
   }
 
   /// Whether the user can attempt a scan right now.
@@ -63,8 +66,9 @@ class AppState extends ChangeNotifier {
   bool get canScan {
     if (_apiKey.isNotEmpty) return true; // BYOK = unlimited
     if (_isPremium) return _backendScansToday < _proScanLimit;
+    if (isAnonymous) return _backendScansToday < _guestScanLimit;
     if (isSignedIn) return _backendScansToday < _freeScanLimit;
-    return _storage.canScan; // local 3/day for guests
+    return false; // not signed in at all
   }
 
   /// Returns a ready-to-use BackendService with the current BYOK key (if any).

@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const FREE_SCAN_LIMIT = 10 // shared with scans — generating a plan costs 1 scan credit
+const GUEST_SCAN_LIMIT = 3  // scans per day for anonymous guests
+const FREE_SCAN_LIMIT = 10  // shared with scans — generating a plan costs 1 scan credit
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -37,10 +38,11 @@ serve(async (req) => {
       .single()
 
     const isPremium = profile?.is_premium ?? false
+    const isAnonymous = user.is_anonymous ?? false
 
     // Atomically check + increment scan count (prevents race conditions)
     const today = new Date().toISOString().split('T')[0]
-    const scanLimit = isPremium ? 999999 : FREE_SCAN_LIMIT
+    const scanLimit = isPremium ? 999999 : isAnonymous ? GUEST_SCAN_LIMIT : FREE_SCAN_LIMIT
 
     const { data: newCount, error: rpcError } = await supabase.rpc(
       'increment_scan_if_allowed',

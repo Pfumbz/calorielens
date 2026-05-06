@@ -6,6 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const GUEST_SCAN_LIMIT = 3 // scans per day for anonymous guests
 const FREE_SCAN_LIMIT = 5  // scans per day for free users
 const PRO_SCAN_LIMIT = 50  // scans per day for Pro users
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024  // 10 MB cap for image payloads
@@ -40,10 +41,11 @@ serve(async (req) => {
       .single()
 
     const isPremium = profile?.is_premium ?? false
+    const isAnonymous = user.is_anonymous ?? false
 
     // Atomically check + increment scan count (prevents race conditions)
     const today = new Date().toISOString().split('T')[0]
-    const scanLimit = isPremium ? PRO_SCAN_LIMIT : FREE_SCAN_LIMIT
+    const scanLimit = isPremium ? PRO_SCAN_LIMIT : isAnonymous ? GUEST_SCAN_LIMIT : FREE_SCAN_LIMIT
 
     const { data: newCount, error: rpcError } = await supabase.rpc(
       'increment_scan_if_allowed',
@@ -55,7 +57,9 @@ serve(async (req) => {
     if (newCount === -1) {
       const message = isPremium
         ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
-        : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
+        : isAnonymous
+          ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
+          : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
       return new Response(
         JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -317,7 +317,7 @@ class _ScanScreenState extends State<ScanScreen>
                 decoration: BoxDecoration(
                   color: (state.isPremium || state.hasApiKey)
                       ? CLColors.green
-                      : state.isSignedIn ? CLColors.green : CLColors.gold,
+                      : (state.isSignedIn && !state.isAnonymous) ? CLColors.green : CLColors.gold,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -325,9 +325,11 @@ class _ScanScreenState extends State<ScanScreen>
               Text(
                 state.hasApiKey
                     ? 'Unlimited'
-                    : (state.isPremium || state.isSignedIn)
-                        ? '${state.scansRemainingToday} left'
-                        : 'Guest',
+                    : state.isAnonymous
+                        ? 'Guest · ${state.scansRemainingToday} left'
+                        : (state.isPremium || state.isSignedIn)
+                            ? '${state.scansRemainingToday} left'
+                            : 'Guest',
                 style: TextStyle(
                   color: (state.isSignedIn || state.hasApiKey) ? CLColors.text : CLColors.muted,
                   fontSize: 11,

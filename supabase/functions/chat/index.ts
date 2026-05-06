@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const FREE_CHAT_LIMIT = 15 // messages per day for free users
+const GUEST_CHAT_LIMIT = 5  // messages per day for anonymous guests
+const FREE_CHAT_LIMIT = 15  // messages per day for free users
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,11 +36,11 @@ serve(async (req) => {
       .single()
 
     const isPremium = profile?.is_premium ?? false
+    const isAnonymous = user.is_anonymous ?? false
     const today = new Date().toISOString().split('T')[0]
 
     // Atomically check + increment chat count (prevents race conditions)
-    // Pro users get effectively unlimited (999999), free users get FREE_CHAT_LIMIT
-    const chatLimit = isPremium ? 999999 : FREE_CHAT_LIMIT
+    const chatLimit = isPremium ? 999999 : isAnonymous ? GUEST_CHAT_LIMIT : FREE_CHAT_LIMIT
 
     const { data: newCount, error: rpcError } = await supabase.rpc(
       'increment_chat_if_allowed',
@@ -49,9 +50,12 @@ serve(async (req) => {
     if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
 
     if (newCount === -1) {
+      const limitMsg = isAnonymous
+        ? `You've used all ${GUEST_CHAT_LIMIT} free guest messages for today. Sign up for more!`
+        : `You've used all ${FREE_CHAT_LIMIT} free coach messages for today. Upgrade to Pro for unlimited AI coaching.`
       return new Response(
         JSON.stringify({
-          error: `You've used all ${FREE_CHAT_LIMIT} free coach messages for today. Upgrade to Pro for unlimited AI coaching.`,
+          error: limitMsg,
           code: 'CHAT_LIMIT_REACHED',
         }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
