@@ -1,5 +1,20 @@
 import 'dart:convert';
 
+// ── Safe parsing helpers ─────────────────────────────────────────────
+int _toInt(dynamic v, [int fallback = 0]) {
+  if (v is int) return v;
+  if (v is double) return v.round();
+  if (v is String) return int.tryParse(v) ?? fallback;
+  return fallback;
+}
+
+double _toDouble(dynamic v, [double fallback = 0.0]) {
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is String) return double.tryParse(v) ?? fallback;
+  return fallback;
+}
+
 // ── Diary Entry ──────────────────────────────────────────────────────
 class DiaryEntry {
   final int id;
@@ -23,14 +38,14 @@ class DiaryEntry {
   });
 
   factory DiaryEntry.fromJson(Map<String, dynamic> j) => DiaryEntry(
-        id: j['id'] as int,
-        time: j['time'] as String,
-        name: j['name'] as String,
-        calories: j['calories'] as int,
-        protein: j['protein'] as int,
-        carbs: j['carbs'] as int,
-        fat: j['fat'] as int,
-        fiber: (j['fiber'] ?? 0) as int,
+        id: _toInt(j['id']),
+        time: (j['time'] ?? '') as String,
+        name: (j['name'] ?? 'Unknown') as String,
+        calories: _toInt(j['calories']),
+        protein: _toInt(j['protein']),
+        carbs: _toInt(j['carbs']),
+        fat: _toInt(j['fat']),
+        fiber: _toInt(j['fiber']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -68,16 +83,16 @@ class ScanResult {
   });
 
   factory ScanResult.fromJson(Map<String, dynamic> j) => ScanResult(
-        mealName: j['meal_name'] ?? 'Unknown Meal',
-        totalCalories: (j['total_calories'] ?? 0) as int,
-        proteinG: (j['protein_g'] ?? 0) as int,
-        carbsG: (j['carbs_g'] ?? 0) as int,
-        fatG: (j['fat_g'] ?? 0) as int,
-        fiberG: (j['fiber_g'] ?? 0) as int,
+        mealName: (j['meal_name'] ?? 'Unknown Meal') as String,
+        totalCalories: _toInt(j['total_calories']),
+        proteinG: _toInt(j['protein_g']),
+        carbsG: _toInt(j['carbs_g']),
+        fatG: _toInt(j['fat_g']),
+        fiberG: _toInt(j['fiber_g']),
         items: (j['items'] as List? ?? [])
             .map((i) => FoodItem.fromJson(i as Map<String, dynamic>))
             .toList(),
-        overallNotes: j['overall_notes'] ?? '',
+        overallNotes: (j['overall_notes'] ?? '') as String,
       );
 }
 
@@ -95,10 +110,10 @@ class FoodItem {
   });
 
   factory FoodItem.fromJson(Map<String, dynamic> j) => FoodItem(
-        name: j['name'] ?? '',
-        portion: j['portion'] ?? '',
-        calories: (j['calories'] ?? 0) as int,
-        note: j['note'] ?? '',
+        name: (j['name'] ?? '') as String,
+        portion: (j['portion'] ?? '') as String,
+        calories: _toInt(j['calories']),
+        note: (j['note'] ?? '') as String,
       );
 }
 
@@ -115,9 +130,9 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
-        role: j['role'] as String,
-        content: j['content'] as String,
-        timestamp: DateTime.parse(j['timestamp'] as String),
+        role: (j['role'] ?? 'user') as String,
+        content: (j['content'] ?? '') as String,
+        timestamp: DateTime.tryParse(j['timestamp']?.toString() ?? '') ?? DateTime.now(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -148,13 +163,13 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
-        name: j['name'] ?? '',
-        age: (j['age'] ?? 0) as int,
-        weight: (j['weight'] ?? 0.0).toDouble(),
-        height: (j['height'] ?? 0) as int,
-        sex: j['sex'] ?? 'm',
-        activity: (j['activity'] ?? 1.55).toDouble(),
-        calorieGoal: (j['calorieGoal'] ?? 2000) as int,
+        name: (j['name'] ?? '') as String,
+        age: _toInt(j['age']),
+        weight: _toDouble(j['weight']),
+        height: _toInt(j['height']),
+        sex: (j['sex'] ?? 'm') as String,
+        activity: _toDouble(j['activity'], 1.55),
+        calorieGoal: _toInt(j['calorieGoal'], 2000),
       );
 
   Map<String, dynamic> toJson() => {

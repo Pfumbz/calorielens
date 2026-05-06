@@ -39,15 +39,15 @@ serve(async (req) => {
     const today = new Date().toISOString().split('T')[0]
     const scanLimit = isPremium ? PRO_SCAN_LIMIT : FREE_SCAN_LIMIT
 
-    const { data: usage } = await supabase
-      .from('usage')
-      .select('scan_count')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .single()
+    // Atomically check + increment scan count (prevents race conditions)
+    const { data: newCount, error: rpcError } = await supabase.rpc(
+      'increment_scan_if_allowed',
+      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+    )
 
-    const scanCount = usage?.scan_count ?? 0
-    if (scanCount >= scanLimit) {
+    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+
+    if (newCount === -1) {
       const message = isPremium
         ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
         : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
@@ -95,24 +95,7 @@ Respond ONLY in this exact JSON (no markdown):
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
 
-    // Increment scan count
-    const { data: currentUsage } = await supabase
-      .from('usage')
-      .select('scan_count')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .single()
-
-    await supabase.from('usage').upsert(
-      {
-        user_id: user.id,
-        date: today,
-        scan_count: (currentUsage?.scan_count ?? 0) + 1,
-        chat_count: 0,
-      },
-      { onConflict: 'user_id,date' }
-    )
-
+    // Usage already incremented atomically above — just return the result
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

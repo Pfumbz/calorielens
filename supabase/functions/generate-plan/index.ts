@@ -38,26 +38,25 @@ serve(async (req) => {
 
     const isPremium = profile?.is_premium ?? false
 
-    // Check daily usage (shared scan credits)
+    // Atomically check + increment scan count (prevents race conditions)
     const today = new Date().toISOString().split('T')[0]
-    if (!isPremium) {
-      const { data: usage } = await supabase
-        .from('usage')
-        .select('scan_count')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single()
+    const scanLimit = isPremium ? 999999 : FREE_SCAN_LIMIT
 
-      const scanCount = usage?.scan_count ?? 0
-      if (scanCount >= FREE_SCAN_LIMIT) {
-        return new Response(
-          JSON.stringify({
-            error: `You've used all ${FREE_SCAN_LIMIT} free AI credits for today. Upgrade to Pro for unlimited meal plan generation.`,
-            code: 'SCAN_LIMIT_REACHED',
-          }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    const { data: newCount, error: rpcError } = await supabase.rpc(
+      'increment_scan_if_allowed',
+      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+    )
+
+    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+
+    if (newCount === -1) {
+      return new Response(
+        JSON.stringify({
+          error: `You've used all ${FREE_SCAN_LIMIT} free AI credits for today. Upgrade to Pro for unlimited meal plan generation.`,
+          code: 'SCAN_LIMIT_REACHED',
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Parse request
@@ -126,24 +125,7 @@ Respond ONLY in this exact JSON (no markdown, no explanation):
     // Validate it's valid JSON before returning
     JSON.parse(clean)
 
-    // Increment scan count
-    const { data: currentUsage } = await supabase
-      .from('usage')
-      .select('scan_count')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .single()
-
-    await supabase.from('usage').upsert(
-      {
-        user_id: user.id,
-        date: today,
-        scan_count: (currentUsage?.scan_count ?? 0) + 1,
-        chat_count: currentUsage?.chat_count ?? 0,
-      },
-      { onConflict: 'user_id,date' }
-    )
-
+    // Usage already incremented atomically above — just return the result
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

@@ -68,6 +68,55 @@ class StorageService {
     await saveDiary(entries, date: date);
   }
 
+  // ── Diary pruning (tier-based retention) ───────────────────────────
+  /// Removes diary entries older than [retainDays] from SharedPreferences.
+  /// Returns the number of days pruned.
+  Future<int> pruneOldDiaries({required int retainDays}) async {
+    final cutoff = DateTime.now().subtract(Duration(days: retainDays));
+    final keys = _prefs.getKeys().where((k) => k.startsWith('cl3_diary_')).toList();
+    int pruned = 0;
+    for (final key in keys) {
+      // Extract date from key: cl3_diary_2026-05-01
+      final dateStr = key.replaceFirst('cl3_diary_', '');
+      try {
+        final parts = dateStr.split('-');
+        if (parts.length != 3) continue;
+        final date = DateTime(
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+          int.parse(parts[2]),
+        );
+        if (date.isBefore(cutoff)) {
+          await _prefs.remove(key);
+          pruned++;
+        }
+      } catch (_) {
+        // Malformed key — skip
+      }
+    }
+    return pruned;
+  }
+
+  /// Also prune old water and scan count keys to keep storage clean.
+  Future<void> pruneOldMeta({required int retainDays}) async {
+    final cutoff = DateTime.now().subtract(Duration(days: retainDays));
+    final prefixes = ['cl5_water_', 'cl5_scans_'];
+    for (final prefix in prefixes) {
+      final keys = _prefs.getKeys().where((k) => k.startsWith(prefix)).toList();
+      for (final key in keys) {
+        final dateStr = key.replaceFirst(prefix, '');
+        try {
+          final parts = dateStr.split('-');
+          if (parts.length != 3) continue;
+          final date = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+          if (date.isBefore(cutoff)) {
+            await _prefs.remove(key);
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
   // ── 7-day diary ───────────────────────────────────────────────────
   List<({DateTime date, List<DiaryEntry> entries})> getWeekDiaries() {
     return List.generate(7, (i) {

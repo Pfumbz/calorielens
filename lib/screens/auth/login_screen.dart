@@ -92,7 +92,12 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _continueAsGuest() {
-    widget.onContinueAsGuest?.call();
+    if (widget.onContinueAsGuest != null) {
+      widget.onContinueAsGuest!.call();
+    } else {
+      // Opened mid-session (from Settings or upgrade prompt) — just go back
+      Navigator.pop(context);
+    }
   }
 
   // ── Build ──────────────────────────────────────────────────────────────
@@ -196,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen>
         const SizedBox(height: 6),
         Text(
           _isSignUp
-              ? 'Sign up for free — 10 AI scans/day included'
+              ? 'Sign up for free — 5 AI scans/day included'
               : 'Sign in to sync your meals and unlock AI features',
           style: const TextStyle(color: CLColors.muted, fontSize: 13, height: 1.4),
         ),
@@ -370,25 +375,29 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildGuestOption() {
+    final isMidSession = widget.onContinueAsGuest == null;
     return Center(
       child: Column(
         children: [
-          const Text(
-            'No account needed to get started',
-            style: TextStyle(color: CLColors.muted2, fontSize: 12),
+          Text(
+            isMidSession
+                ? 'You can always sign up later'
+                : 'No account needed to get started',
+            style: const TextStyle(color: CLColors.muted2, fontSize: 12),
           ),
           const SizedBox(height: 4),
           TextButton(
             onPressed: _continueAsGuest,
-            child: const Text(
-              'Continue as Guest  →',
-              style: TextStyle(color: CLColors.muted, fontSize: 13),
+            child: Text(
+              isMidSession ? '← Go back' : 'Continue as Guest  →',
+              style: const TextStyle(color: CLColors.muted, fontSize: 13),
             ),
           ),
-          const Text(
-            '3 free AI scans/day · no sync',
-            style: TextStyle(color: CLColors.muted2, fontSize: 11),
-          ),
+          if (!isMidSession)
+            const Text(
+              '3 free AI scans/day · no sync',
+              style: TextStyle(color: CLColors.muted2, fontSize: 11),
+            ),
         ],
       ),
     );

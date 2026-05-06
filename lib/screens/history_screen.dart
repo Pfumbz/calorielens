@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
+import '../widgets/upgrade_modal.dart';
 
 /// Displays past diary entries grouped by day.
 /// Accessible from the TodayScreen via a "View history" link.
@@ -17,16 +18,23 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   final _storage = StorageService();
   int _daysToLoad = 30;
-  late List<({DateTime date, List<DiaryEntry> entries})> _dayEntries;
+  List<({DateTime date, List<DiaryEntry> entries})> _dayEntries = [];
+  bool _initialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadData();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _loadData();
+      _initialized = true;
+    }
   }
 
   void _loadData() {
-    _dayEntries = _storage.getDiaryRange(days: _daysToLoad);
+    final state = context.read<AppState>();
+    final maxDays = state.historyRetainDays;
+    final loadDays = _daysToLoad.clamp(1, maxDays);
+    _dayEntries = _storage.getDiaryRange(days: loadDays);
   }
 
   void _loadMore() {
@@ -40,6 +48,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final goal = state.calorieGoal;
+    final isPro = state.isPremium || state.hasApiKey;
+    final isGuest = !state.isSignedIn && !state.hasApiKey;
 
     return Scaffold(
       backgroundColor: CLColors.bg,
@@ -54,15 +64,74 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ? _buildEmptyState()
           : ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _dayEntries.length + 1, // +1 for "load more" button
+              itemCount: _dayEntries.length + 1 + (isPro ? 0 : 1), // +1 load more, +1 banner
               itemBuilder: (context, index) {
-                if (index == _dayEntries.length) {
-                  return _buildLoadMore();
+                // Tier upgrade banner at the top
+                if (!isPro && index == 0) {
+                  return _buildRetentionBanner(context, isGuest);
                 }
-                final day = _dayEntries[index];
+                final adjustedIndex = isPro ? index : index - 1;
+                if (adjustedIndex == _dayEntries.length) {
+                  return isPro ? _buildLoadMore() : const SizedBox.shrink();
+                }
+                final day = _dayEntries[adjustedIndex];
                 return _buildDayCard(day.date, day.entries, goal);
               },
             ),
+    );
+  }
+
+  Widget _buildRetentionBanner(BuildContext context, bool isGuest) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CLColors.goldLo,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CLColors.gold.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history, color: CLColors.gold.withOpacity(0.8), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isGuest
+                      ? 'Only showing last 3 days'
+                      : 'Only showing last 7 days',
+                  style: const TextStyle(color: CLColors.gold, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isGuest
+                      ? 'Sign in to keep 7 days, or go Pro for unlimited history.'
+                      : 'Upgrade to Pro for unlimited meal history.',
+                  style: TextStyle(color: CLColors.gold.withOpacity(0.7), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => showUpgradeModal(context, source: 'history'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: CLColors.gold.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: CLColors.gold.withOpacity(0.3)),
+              ),
+              child: Text(
+                isGuest ? 'Sign in' : 'Go Pro',
+                style: const TextStyle(color: CLColors.gold, fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

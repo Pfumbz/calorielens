@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
@@ -47,7 +48,7 @@ class BackendService {
         'imageBase64': base64Encode(imageBytes),
         'mediaType': mediaType,
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     return _parseScanResponse(res);
   }
@@ -63,7 +64,7 @@ class BackendService {
       Uri.parse('$_functionsBaseUrl/scan-text'),
       headers: _authHeaders,
       body: jsonEncode({'description': description}),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     return _parseScanResponse(res);
   }
@@ -86,7 +87,7 @@ class BackendService {
     _requireSignIn();
 
     final res = await http.post(
-      Uri.parse('$_functionsBaseUrl/generate-plane'),
+      Uri.parse('$_functionsBaseUrl/generate-plan'),
       headers: _authHeaders,
       body: jsonEncode({
         'calorieGoal': calorieGoal,
@@ -94,7 +95,7 @@ class BackendService {
         'dietaryPreference': dietaryPreference,
         'profileContext': profileContext,
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     _checkRateLimit(res, isScan: false);
     _checkSuccess(res);
@@ -116,7 +117,7 @@ class BackendService {
         'mediaType': mediaType,
         'mode': 'fridge', // tells the Edge Function to use fridge prompt
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     _checkRateLimit(res, isScan: true);
     _checkSuccess(res);
@@ -147,7 +148,7 @@ class BackendService {
         'userMessage': userMessage,
         'systemPrompt': systemPrompt,
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     _checkRateLimit(res, isScan: false);
     _checkSuccess(res);

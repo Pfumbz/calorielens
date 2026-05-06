@@ -195,6 +195,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _guestMode = false;
+  bool _signInHandled = false;
 
   @override
   Widget build(BuildContext context) {
@@ -212,12 +213,18 @@ class _AuthGateState extends State<AuthGate> {
         final isSignedIn = SupabaseService.isSignedIn;
 
         if (isSignedIn) {
-          // Trigger cloud sync after sign-in
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.read<AppState>().onSignIn();
-          });
+          // Trigger cloud sync only once per sign-in session
+          if (!_signInHandled) {
+            _signInHandled = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              context.read<AppState>().onSignIn();
+            });
+          }
           return const AppShell();
         }
+
+        // User signed out — reset guard so next sign-in triggers sync
+        _signInHandled = false;
 
         // Show login screen — pass callback so "Continue as Guest" works
         return LoginScreen(
@@ -277,7 +284,19 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // If on Coach tab with active chat, clear chat first (back to dashboard)
+          if (_currentIndex == 2 && CoachScreen.hasChatMessages) {
+            CoachScreen.clearChat?.call();
+          } else {
+            setState(() => _currentIndex = 0);
+          }
+        }
+      },
+      child: Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
@@ -292,6 +311,7 @@ class _AppShellState extends State<AppShell> {
           items: _navItems,
         ),
       ),
+    ),
     );
   }
 }

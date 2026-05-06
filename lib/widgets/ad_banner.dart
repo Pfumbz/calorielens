@@ -38,9 +38,15 @@ class _AdBannerState extends State<AdBanner> {
   }
 
   void _loadAd() {
+    // Use adaptive banner for full-width fit, fall back to standard 320x50
+    final screenWidth = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize.width /
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    final adWidth = (screenWidth - 72).clamp(280, 460).toInt(); // account for padding
+    final adSize = AdSize(width: adWidth, height: 50);
+
     _bannerAd = BannerAd(
       adUnitId: _adUnitId,
-      size: AdSize.banner, // 320x50 standard banner
+      size: adSize,
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) {
@@ -49,7 +55,24 @@ class _AdBannerState extends State<AdBanner> {
         onAdFailedToLoad: (ad, error) {
           debugPrint('AdBanner failed to load: ${error.message}');
           ad.dispose();
-          if (mounted) setState(() => _bannerAd = null);
+          _bannerAd = null;
+          // Retry with standard 320x50 size as fallback
+          if (mounted) {
+            _bannerAd = BannerAd(
+              adUnitId: _adUnitId,
+              size: AdSize.banner,
+              request: const AdRequest(),
+              listener: BannerAdListener(
+                onAdLoaded: (ad) {
+                  if (mounted) setState(() => _isLoaded = true);
+                },
+                onAdFailedToLoad: (ad, err) {
+                  ad.dispose();
+                  if (mounted) setState(() => _bannerAd = null);
+                },
+              ),
+            )..load();
+          }
         },
       ),
     )..load();
@@ -74,14 +97,14 @@ class _AdBannerState extends State<AdBanner> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: CLColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       alignment: Alignment.center,
-      width: _bannerAd!.size.width.toDouble(),
+      width: double.infinity,
       height: _bannerAd!.size.height.toDouble(),
       child: AdWidget(ad: _bannerAd!),
     );

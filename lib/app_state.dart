@@ -70,6 +70,21 @@ class AppState extends ChangeNotifier {
   /// Returns a ready-to-use BackendService with the current BYOK key (if any).
   BackendService get backend => BackendService(byokApiKey: _apiKey.isNotEmpty ? _apiKey : null);
 
+  // ── Diary retention limits per tier ──────────────────────────────────────
+  static const int _guestRetainDays = 3;
+  static const int _freeRetainDays = 7;
+  // Pro / BYOK = unlimited (no pruning)
+
+  /// Returns the diary retention limit in days for the current user tier.
+  int get _diaryRetainDays {
+    if (_isPremium || _apiKey.isNotEmpty) return 365 * 5; // effectively unlimited
+    if (_supabaseUser != null) return _freeRetainDays;
+    return _guestRetainDays;
+  }
+
+  /// The maximum history days the user's tier allows (for UI display).
+  int get historyRetainDays => _diaryRetainDays;
+
   // ── Initialisation ───────────────────────────────────────────────────────
   Future<void> init() async {
     // Always load local data first (works offline)
@@ -88,6 +103,9 @@ class AppState extends ChangeNotifier {
       await _refreshFromCloud();
     }
 
+    // Prune old diary entries based on user tier
+    unawaited(_pruneDiaryForTier());
+
     // Check if coaching nudge should fire on app open
     unawaited(NotificationService.checkAndScheduleNudge(
       caloriesEaten: totalCalories,
@@ -96,6 +114,13 @@ class AppState extends ChangeNotifier {
     ));
 
     notifyListeners();
+  }
+
+  /// Prune diary entries that exceed the current tier's retention limit.
+  Future<void> _pruneDiaryForTier() async {
+    final retain = _diaryRetainDays;
+    await _storage.pruneOldDiaries(retainDays: retain);
+    await _storage.pruneOldMeta(retainDays: retain);
   }
 
   // ── Called by main.dart when auth state becomes signed-in ──────────────
@@ -344,6 +369,11 @@ class AppState extends ChangeNotifier {
     _supabaseUser = null;
     _backendScansToday = 0;
     _backendChatsToday = 0;
+
+    // Prune diary down to guest limits
+    unawaited(_storage.pruneOldDiaries(retainDays: _guestRetainDays));
+    unawaited(_storage.pruneOldMeta(retainDays: _guestRetainDays));
+
     notifyListeners();
   }
 }

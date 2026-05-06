@@ -8,6 +8,7 @@ const corsHeaders = {
 
 const FREE_SCAN_LIMIT = 5  // scans per day for free users
 const PRO_SCAN_LIMIT = 50  // scans per day for Pro users
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024  // 10 MB cap for image payloads
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -40,19 +41,18 @@ serve(async (req) => {
 
     const isPremium = profile?.is_premium ?? false
 
-    // Check daily scan count (enforce limits for both free and Pro)
+    // Atomically check + increment scan count (prevents race conditions)
     const today = new Date().toISOString().split('T')[0]
     const scanLimit = isPremium ? PRO_SCAN_LIMIT : FREE_SCAN_LIMIT
 
-    const { data: usage } = await supabase
-      .from('usage')
-      .select('scan_count')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .single()
+    const { data: newCount, error: rpcError } = await supabase.rpc(
+      'increment_scan_if_allowed',
+      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+    )
 
-    const scanCount = usage?.scan_count ?? 0
-    if (scanCount >= scanLimit) {
+    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+
+    if (newCount === -1) {
       const message = isPremium
         ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
         : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
@@ -69,6 +69,24 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // Validate image size (base64 is ~4/3 of raw bytes)
+    const estimatedBytes = Math.ceil(imageBase64.length * 3 / 4)
+    if (estimatedBytes > MAX_IMAGE_BYTES) {
+      return new Response(
+        JSON.stringify({ error: 'Image is too large. Please use a smaller photo (max 10 MB).' }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate media type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(mediaType)) {
+      return new Response(
+        JSON.stringify({ error: 'Unsupported image format. Use JPEG, PNG, WebP, or GIF.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Call Anthropic API (key stored securely in Supabase vault)
@@ -120,24 +138,7 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
 
-    // Increment scan count in usage table
-    const { data: currentUsage } = await supabase
-      .from('usage')
-      .select('scan_count')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .single()
-
-    await supabase.from('usage').upsert(
-      {
-        user_id: user.id,
-        date: today,
-        scan_count: (currentUsage?.scan_count ?? 0) + 1,
-        chat_count: 0,
-      },
-      { onConflict: 'user_id,date' }
-    )
-
+    // Usage already incremented atomically above — just return the result
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

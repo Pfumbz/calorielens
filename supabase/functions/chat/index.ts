@@ -37,24 +37,25 @@ serve(async (req) => {
     const isPremium = profile?.is_premium ?? false
     const today = new Date().toISOString().split('T')[0]
 
-    if (!isPremium) {
-      const { data: usage } = await supabase
-        .from('usage')
-        .select('chat_count')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single()
+    // Atomically check + increment chat count (prevents race conditions)
+    // Pro users get effectively unlimited (999999), free users get FREE_CHAT_LIMIT
+    const chatLimit = isPremium ? 999999 : FREE_CHAT_LIMIT
 
-      const chatCount = usage?.chat_count ?? 0
-      if (chatCount >= FREE_CHAT_LIMIT) {
-        return new Response(
-          JSON.stringify({
-            error: `You've used all ${FREE_CHAT_LIMIT} free coach messages for today. Upgrade to Pro for unlimited AI coaching.`,
-            code: 'CHAT_LIMIT_REACHED',
-          }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+    const { data: newCount, error: rpcError } = await supabase.rpc(
+      'increment_chat_if_allowed',
+      { p_user_id: user.id, p_date: today, p_limit: chatLimit }
+    )
+
+    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+
+    if (newCount === -1) {
+      return new Response(
+        JSON.stringify({
+          error: `You've used all ${FREE_CHAT_LIMIT} free coach messages for today. Upgrade to Pro for unlimited AI coaching.`,
+          code: 'CHAT_LIMIT_REACHED',
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const { history, userMessage, systemPrompt } = await req.json()
@@ -98,24 +99,7 @@ serve(async (req) => {
       .map((b: { text?: string }) => b.text ?? '')
       .join('')
 
-    // Increment chat count
-    const { data: currentUsage } = await supabase
-      .from('usage')
-      .select('chat_count')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .single()
-
-    await supabase.from('usage').upsert(
-      {
-        user_id: user.id,
-        date: today,
-        scan_count: 0,
-        chat_count: (currentUsage?.chat_count ?? 0) + 1,
-      },
-      { onConflict: 'user_id,date' }
-    )
-
+    // Usage already incremented atomically above — just return the result
     return new Response(JSON.stringify({ response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

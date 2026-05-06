@@ -1,13 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
+import '../screens/auth/login_screen.dart';
 import '../theme.dart';
 import '../utils/pricing.dart';
 
 /// Call this from anywhere to show the Pro upgrade sheet.
 /// [source] controls the contextual message shown:
 ///   'scan_limit' | 'week_report' | 'budget_coach' | 'settings'
+///
+/// If the user is a guest (not signed in, no API key), they are redirected
+/// to the login screen instead — Pro requires an account.
 void showUpgradeModal(BuildContext context, {String source = 'generic'}) {
+  final state = context.read<AppState>();
+  final isGuest = !state.isSignedIn && !state.hasApiKey;
+
+  if (isGuest) {
+    // Capture navigator before showing dialog so it stays valid
+    final navigator = Navigator.of(context);
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: CLColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.lock_outline, color: CLColors.gold, size: 22),
+            const SizedBox(width: 10),
+            const Text('Account Required',
+                style: TextStyle(color: CLColors.text, fontSize: 17, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        content: const Text(
+          'You need a free account before you can upgrade to Pro. It only takes a minute!',
+          style: TextStyle(color: CLColors.muted, fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Not now', style: TextStyle(color: CLColors.muted, fontSize: 14)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              navigator.push(MaterialPageRoute(builder: (_) => const LoginScreen()));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CLColors.gold,
+              foregroundColor: const Color(0xFF0E0C08),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text('Sign in / Sign up', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+    return;
+  }
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -30,11 +82,13 @@ class UpgradeModal extends StatelessWidget {
       case 'week_report':
         return "The Weekly Progress Report is a Pro feature. Unlock your full 7-day analysis with trends and AI insights.";
       case 'budget_coach':
-        return "The AI Budget Coach is a Pro feature. Get real-time advice on what to eat with your remaining calories.";
+        return "The AI Smart Coach is a Pro feature. Get personalised meal suggestions, weekly insights, and smarter prompts.";
       case 'generate_plan':
         return "AI Meal Plan Generation is a Pro feature. Get personalised meal plans tailored to your calorie goal, budget, and dietary preferences.";
       case 'fridge_scan':
         return "Fridge Scanner is a Pro feature. Snap a photo of your fridge and AI will identify your ingredients and suggest meal plans.";
+      case 'history':
+        return "Free accounts keep 7 days of meal history. Upgrade to Pro for unlimited history — never lose your progress.";
       default:
         return "Upgrade to Pro to remove all limits and unlock the complete CalorieLens experience.";
     }
@@ -49,7 +103,8 @@ class UpgradeModal extends StatelessWidget {
         border: Border(top: BorderSide(color: Color(0x40C4A040))),
       ),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Handle
@@ -136,7 +191,8 @@ class UpgradeModal extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          // CTA
+          // CTA — only signed-in users reach this modal (guests are
+          // redirected to LoginScreen by showUpgradeModal before it opens)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -168,6 +224,7 @@ class UpgradeModal extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -175,9 +232,9 @@ class UpgradeModal extends StatelessWidget {
     'Up to 50 meal scans per day',
     'AI-generated personalised meal plans',
     'Fridge Scanner — snap & get recipe ideas',
-    'AI Budget Coach — "What can I eat right now?"',
+    'AI Smart Coach — personalised meal advice',
     'Weekly Progress Report — full 7-day analysis',
-    'Unlimited AI Coach with full history',
+    'Unlimited Smart Coach with full history',
     'No ads',
   ];
 }

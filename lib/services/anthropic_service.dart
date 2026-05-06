@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
@@ -56,7 +57,8 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
       ]
     });
 
-    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body);
+    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
     return _parseResponse(res);
   }
 
@@ -86,7 +88,8 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
       ]
     });
 
-    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body);
+    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
     return _parseResponse(res);
   }
 
@@ -145,7 +148,8 @@ Respond ONLY in this exact JSON (no markdown, no explanation):
       ]
     });
 
-    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body);
+    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
     if (res.statusCode != 200) {
       final err = jsonDecode(res.body);
       throw Exception(err['error']?['message'] ?? 'API error ${res.statusCode}');
@@ -189,7 +193,8 @@ Be specific (e.g. "chicken thighs" not just "meat", "cheddar cheese" not just "c
       ]
     });
 
-    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body);
+    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
     if (res.statusCode != 200) {
       final err = jsonDecode(res.body);
       throw Exception(err['error']?['message'] ?? 'API error ${res.statusCode}');
@@ -221,7 +226,8 @@ Be specific (e.g. "chicken thighs" not just "meat", "cheddar cheese" not just "c
       'messages': messages,
     });
 
-    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body);
+    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
     if (res.statusCode != 200) {
       final err = jsonDecode(res.body);
       throw Exception(err['error']?['message'] ?? 'API error ${res.statusCode}');
