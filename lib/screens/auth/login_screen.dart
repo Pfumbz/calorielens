@@ -72,10 +72,13 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (result.success) {
       if (result.user == null) {
-        // Email confirmation sent
+        // Email confirmation required
         setState(() => _infoMsg = result.error);
+      } else if (_isSignUp) {
+        // Account created and auto-signed in — show brief success before navigation
+        setState(() => _infoMsg = 'Account created! Signing you in...');
       }
-      // If user is non-null, main.dart's StreamBuilder will navigate automatically
+      // main.dart's auth stream will navigate automatically once signed in
     } else {
       setState(() => _errorMsg = result.error);
     }
