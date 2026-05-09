@@ -420,9 +420,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: isPro ? 'Manage subscription' : 'Upgrade to Pro — ${getLocalPricing().fullPrice}',
             labelColor: CLColors.accent,
             onTap: isPro
-                ? () => _handleCancelPro()
+                ? () => _handleManageSubscription()
                 : () => showUpgradeModal(context, source: 'settings'),
           ),
+          // Restore purchases option (always visible for signed-in users)
+          if (!isPro && state.isSignedIn) ...[
+            const Divider(color: CLColors.border, height: 1),
+            _tappableRow(
+              icon: null,
+              label: 'Restore purchases',
+              labelColor: CLColors.muted,
+              onTap: () async {
+                await context.read<AppState>().restorePurchases();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Checking for previous purchases...'),
+                      backgroundColor: CLColors.surface,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -450,32 +472,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _handleCancelPro() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: CLColors.surface,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cancel Pro?',
-            style: TextStyle(color: CLColors.text)),
-        content: const Text(
-            'You will return to the free tier with 5 scans/day and ads.',
-            style: TextStyle(color: CLColors.muted)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Keep Pro')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: CLColors.red),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+  Future<void> _handleManageSubscription() async {
+    // Open Google Play subscription management page.
+    // This lets the user cancel, change payment, or view their subscription.
+    final uri = Uri.parse(
+      'https://play.google.com/store/account/subscriptions?sku=calorielens_pro_monthly&package=com.pcmacstudios.calorielens',
     );
-    if (ok == true && mounted) {
-      await context.read<AppState>().cancelPremium();
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      // Fallback: open general Play Store subscriptions page
+      final fallback = Uri.parse('https://play.google.com/store/account/subscriptions');
+      await launchUrl(fallback, mode: LaunchMode.externalApplication);
     }
   }
 

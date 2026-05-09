@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.calorielens"
+    namespace = "com.pcmacstudios.calorielens"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.calorielens"
+        applicationId = "com.pcmacstudios.calorielens"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

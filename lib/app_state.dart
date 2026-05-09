@@ -5,9 +5,11 @@ import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'services/supabase_service.dart';
 import 'services/backend_service.dart';
+import 'services/purchase_service.dart';
 
 class AppState extends ChangeNotifier {
   final _storage = StorageService();
+  final _purchases = PurchaseService();
 
   // ── Local state (always populated — offline-first) ──────────────────────
   List<DiaryEntry> _diary = [];
@@ -106,6 +108,17 @@ class AppState extends ChangeNotifier {
     if (_supabaseUser != null) {
       await _refreshFromCloud();
     }
+
+    // Initialise in-app purchases and listen for subscription changes
+    _purchases.onPremiumChanged = (isPremium) async {
+      _isPremium = isPremium;
+      await _storage.setPremium(isPremium);
+      if (isSignedIn) {
+        unawaited(SupabaseService.updateProfile({'is_premium': isPremium}));
+      }
+      notifyListeners();
+    };
+    unawaited(_purchases.init());
 
     // Prune old diary entries based on user tier
     unawaited(_pruneDiaryForTier());
@@ -337,7 +350,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Premium ──────────────────────────────────────────────────────────────
+  // ── Premium / Purchases ──────────────────────────────────────────────────
+
+  /// Access the purchase service (for UI to trigger purchases).
+  PurchaseService get purchases => _purchases;
+
+  /// Activate premium (called by PurchaseService callback or for BYOK users).
   Future<void> activatePremium() async {
     await _storage.setPremium(true);
     _isPremium = true;
@@ -347,6 +365,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Cancel premium locally (subscription cancellation is handled via Play Store).
   Future<void> cancelPremium() async {
     await _storage.setPremium(false);
     _isPremium = false;
@@ -354,6 +373,11 @@ class AppState extends ChangeNotifier {
       unawaited(SupabaseService.updateProfile({'is_premium': false}));
     }
     notifyListeners();
+  }
+
+  /// Restore previous purchases from Google Play.
+  Future<void> restorePurchases() async {
+    await _purchases.restorePurchases();
   }
 
   // ── Meal plan favourites ──────────────────────────────────────────────────

@@ -51,6 +51,9 @@ dependencies:
   # Ads (Google AdMob)
   google_mobile_ads: ^5.3.0
 
+  # In-app purchases (Google Play Billing)
+  in_app_purchase: ^3.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

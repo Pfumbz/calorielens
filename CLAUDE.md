@@ -132,9 +132,9 @@ Edge Functions require the `ANTHROPIC_API_KEY` secret set in Supabase Dashboard 
 3. ~~**End-to-end test**~~ — ✅ DONE. AI scan works via Edge Functions.
 4. ~~**Push to GitHub → Codemagic rebuild**~~ — ✅ DONE. Nav restructure, settings cleanup, bug fixes all pushed.
 5. ~~**Clean up duplicate Web client secret**~~ — ✅ DONE. Old secret (`****kzYw`) deleted.
-6. **In-app purchases** — the upgrade modal UI exists (`lib/widgets/upgrade_modal.dart`) but no real payment processor is connected. Needs Google Play Billing integration.
+6. ~~**In-app purchases**~~ — ✅ DONE. Uses `in_app_purchase` package with Google Play Billing. PurchaseService singleton manages subscription lifecycle. Product ID: `calorielens_pro_monthly`. Needs subscription created in Google Play Console to go live.
 7. ~~**Barcode scanning**~~ — ✅ DONE. Uses `mobile_scanner` + Open Food Facts API with AI fallback.
-8. **Dead code cleanup** — `workout_screen.dart` and `data/exercises.dart` are no longer referenced from navigation. Can be deleted.
+8. ~~**Dead code cleanup**~~ — ✅ DONE. `workout_screen.dart` and `data/exercises.dart` deleted.
 
 ### Recent Changes (April 2026)
 - Restructured bottom nav from 5 tabs to 4: Scan · Today · Coach · Meals
@@ -152,3 +152,5 @@ Edge Functions require the `ANTHROPIC_API_KEY` secret set in Supabase Dashboard 
 - Fixed keyboard overlapping edit sheet (SingleChildScrollView + correct BuildContext for viewInsets)
 - Fixed gallery image picker crash (added maxWidth/maxHeight + retrieveLostData for Android activity restart)
 - Added barcode scanning: third mode in Scan tab (Photo / Describe / Barcode), uses Open Food Facts API for nutrition lookup, falls back to AI estimation if product not found
+- Added Google Play Billing integration: `in_app_purchase` package, `PurchaseService` singleton in `lib/services/purchase_service.dart`, upgrade modal triggers real purchase flow, Settings links to Play Store subscription management, restore purchases support added
+- Codemagic pre-build script now decodes a release keystore (base64 env var) and imports it as debug.keystore for consistent Google Sign-In SHA-1 across builds

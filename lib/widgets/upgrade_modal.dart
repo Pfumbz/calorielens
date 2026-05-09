@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../screens/auth/login_screen.dart';
+import '../services/purchase_service.dart';
 import '../theme.dart';
 import '../utils/pricing.dart';
 
@@ -68,15 +70,23 @@ void showUpgradeModal(BuildContext context, {String source = 'generic'}) {
   );
 }
 
-class UpgradeModal extends StatelessWidget {
+class UpgradeModal extends StatefulWidget {
   final String source;
   const UpgradeModal({super.key, required this.source});
+
+  @override
+  State<UpgradeModal> createState() => _UpgradeModalState();
+}
+
+class _UpgradeModalState extends State<UpgradeModal> {
+  bool _purchasing = false;
+  StreamSubscription<ProPurchaseState>? _purchaseSub;
 
   // Detect local pricing once per modal build
   PricingInfo get _pricing => getLocalPricing();
 
   String get _contextMessage {
-    switch (source) {
+    switch (widget.source) {
       case 'scan_limit':
         return "You've used all 5 free scans for today. Upgrade to Pro for up to 50 scans/day — never miss logging a meal.";
       case 'week_report':
@@ -95,7 +105,103 @@ class UpgradeModal extends StatelessWidget {
   }
 
   @override
+  void initState() {
+    super.initState();
+    final purchases = context.read<AppState>().purchases;
+    _purchaseSub = purchases.stateStream.listen(_onPurchaseState);
+  }
+
+  @override
+  void dispose() {
+    _purchaseSub?.cancel();
+    super.dispose();
+  }
+
+  void _onPurchaseState(ProPurchaseState state) {
+    if (!mounted) return;
+
+    switch (state) {
+      case ProPurchaseState.loading:
+        setState(() => _purchasing = true);
+        break;
+      case ProPurchaseState.purchased:
+      case ProPurchaseState.restored:
+        setState(() => _purchasing = false);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Pro activated! Enjoy unlimited access.'),
+            backgroundColor: CLColors.gold,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        break;
+      case ProPurchaseState.error:
+        setState(() => _purchasing = false);
+        final error = context.read<AppState>().purchases.lastError ?? 'Purchase failed.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        break;
+      case ProPurchaseState.cancelled:
+        setState(() => _purchasing = false);
+        break;
+      case ProPurchaseState.idle:
+        break;
+    }
+  }
+
+  Future<void> _handlePurchase() async {
+    final purchases = context.read<AppState>().purchases;
+
+    if (!purchases.storeAvailable || !purchases.hasProduct) {
+      // Store not available or product not loaded — fall back to
+      // manual activation (for development/testing only)
+      if (!purchases.storeAvailable) {
+        // In development builds, allow manual activation for testing
+        await context.read<AppState>().activatePremium();
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Pro activated (dev mode). Connect Play Store for real billing.'),
+              backgroundColor: CLColors.gold,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Product not loaded yet
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Subscription loading... please try again in a moment.'),
+          backgroundColor: CLColors.surface,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    // Trigger real purchase
+    await purchases.buyProMonthly();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Use Google Play price if available, otherwise fall back to local pricing
+    final purchases = context.read<AppState>().purchases;
+    final storePrice = purchases.proPrice;
+
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF131210),
@@ -162,7 +268,7 @@ class UpgradeModal extends StatelessWidget {
           // Feature list
           ..._features.map((f) => _FeatureRow(text: f)),
           const SizedBox(height: 20),
-          // Price — locale-aware
+          // Price — prefer Google Play price, fall back to locale-aware pricing
           Column(
             children: [
               Row(
@@ -170,56 +276,66 @@ class UpgradeModal extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    _pricing.fullPrice.replaceAll('/month', ''),
+                    storePrice ?? _pricing.fullPrice.replaceAll('/month', ''),
                     style: const TextStyle(
                       color: CLColors.text,
                       fontSize: 32,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 6, left: 4),
-                    child: Text('/month',
-                        style: TextStyle(color: CLColors.muted, fontSize: 14)),
-                  ),
+                  if (storePrice == null)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 6, left: 4),
+                      child: Text('/month',
+                          style: TextStyle(color: CLColors.muted, fontSize: 14)),
+                    ),
                 ],
               ),
               Text(
-                '${_pricing.currency} · Cancel anytime · 7-day free trial',
+                storePrice != null
+                    ? 'per month · Cancel anytime · 7-day free trial'
+                    : '${_pricing.currency} · Cancel anytime · 7-day free trial',
                 style: const TextStyle(color: CLColors.muted, fontSize: 11),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          // CTA — only signed-in users reach this modal (guests are
-          // redirected to LoginScreen by showUpgradeModal before it opens)
+          // CTA — triggers real Google Play purchase
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                context.read<AppState>().activatePremium();
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('⭐  Pro activated! Enjoy unlimited access.'),
-                    backgroundColor: CLColors.gold,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                );
-              },
+              onPressed: _purchasing ? null : _handlePurchase,
               style: ElevatedButton.styleFrom(
                 backgroundColor: CLColors.gold,
                 foregroundColor: const Color(0xFF0E0C08),
+                disabledBackgroundColor: CLColors.gold.withOpacity(0.5),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.5),
               ),
-              child: const Text('START 7-DAY FREE TRIAL  →'),
+              child: _purchasing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Color(0xFF0E0C08),
+                      ),
+                    )
+                  : const Text('START 7-DAY FREE TRIAL'),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          // Restore purchases link
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _purchasing
+                ? null
+                : () => context.read<AppState>().restorePurchases(),
+            child: const Text('Restore purchases',
+                style: TextStyle(color: CLColors.muted, fontSize: 12)),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: _purchasing ? null : () => Navigator.pop(context),
             child: const Text('Maybe later', style: TextStyle(color: CLColors.muted, fontSize: 13)),
           ),
         ],
