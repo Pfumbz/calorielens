@@ -123,10 +123,29 @@ class _CoachScreenState extends State<CoachScreen> {
       }
 
       buf.writeln(
-          '\nYou are the user\'s PRO Smart Coach. Be direct and action-oriented. Tell them exactly what to eat, not just advice. Reference their weekly patterns and specific meals they\'ve logged. Identify trends (e.g. "you\'ve been low on protein 4 out of 7 days" or "rice appears 5 times this week — try varying your carb sources"). Keep answers focused and under 200 words.\nFormat your responses with markdown: use ## for section headers, **bold** for key numbers and food names, numbered lists for steps, and bullet points for options. This makes responses easy to scan.');
+          '\nYou are the user\'s PRO Smart Coach — warm, supportive, and action-oriented. '
+          'Reference their weekly patterns and specific meals they\'ve logged. '
+          'Identify trends gently (e.g. "I noticed protein has been a bit low on a few days this week" '
+          'rather than "you\'ve been failing to hit protein targets"). '
+          'When data is limited (few days logged), acknowledge that the diary may be incomplete '
+          'and frame insights as preliminary. Never be judgmental about eating choices. '
+          'Keep answers focused and under 200 words.\n\n'
+          'RESPONSE FORMAT — always structure your replies using these sections:\n'
+          '## Today\'s Priority\nOne key focus for today based on their data.\n'
+          '## Recommended Action\nA specific, actionable step they can take right now.\n'
+          '## Why This Matters\nOne sentence explaining the benefit.\n'
+          '## Suggested Meal\nOne concrete meal idea with approximate macros.\n\n'
+          'Use **bold** for key numbers and food names. '
+          'You can skip sections if the user asked a specific question — just answer naturally with ## headers. '
+          'For follow-up questions, respond conversationally but still use ## headers and bullet points.');
     } else {
       buf.writeln(
-          '\nBe concise and practical. Keep responses under 120 words. Use **bold** for key numbers, bullet points for lists. If they ask about detailed analysis, mention Smart Coach Pro gives deeper personalised insights.');
+          '\nBe warm, concise, and encouraging. Keep responses under 120 words. '
+          'When the user\'s data is limited, mention that logging more meals will help you give better advice. '
+          'Never be judgmental about eating choices — focus on what they can add, not what they did wrong. '
+          'Use **bold** for key numbers, bullet points for lists. '
+          'Structure replies with a clear ## header for the main point, then a brief tip or suggestion. '
+          'If they ask about detailed analysis, mention Smart Coach Pro gives deeper personalised insights.');
     }
 
     return buf.toString();
@@ -157,17 +176,17 @@ class _CoachScreenState extends State<CoachScreen> {
         value: '${proteinGap}g protein',
         color: CLColors.green,
         prompt:
-            'I need ${proteinGap}g more protein today. What high-protein foods should I eat with my remaining ${state.caloriesLeft} calories?',
+            'I could use about ${proteinGap}g more protein today. What are some tasty high-protein options that fit within my remaining ${state.caloriesLeft} calories?',
       ));
     }
 
     if (fatExcess > 10) {
       fixes.add(_SmartFixItem(
-        label: '− Reduce',
-        value: '${fatExcess}g fat',
+        label: 'Balance',
+        value: 'fat intake',
         color: CLColors.accent,
         prompt:
-            'I\'ve had ${fatExcess}g more fat than ideal today. How should I adjust my remaining meals to balance this out?',
+            'My fat intake is a bit higher than usual today. What lighter meal options would help balance things out for the rest of the day?',
       ));
     } else if (proteinGap <= 10 && state.totalFat < targets.fat - 10) {
       fixes.add(_SmartFixItem(
@@ -175,18 +194,18 @@ class _CoachScreenState extends State<CoachScreen> {
         value: '${targets.fat - state.totalFat}g fat',
         color: CLColors.accent,
         prompt:
-            'I\'m low on healthy fats today. What should I eat to get more healthy fats with my remaining calories?',
+            'I could use some more healthy fats today. What are good options to add with my remaining calories?',
       ));
     }
 
     if (carbDiff.abs() > 20) {
       fixes.add(_SmartFixItem(
         label: carbDiff > 0 ? 'Balance' : '+ Add',
-        value: carbDiff > 0 ? 'Carbs intake' : '${carbDiff.abs()}g carbs',
+        value: carbDiff > 0 ? 'carb intake' : '${carbDiff.abs()}g carbs',
         color: CLColors.blue,
         prompt: carbDiff > 0
-            ? 'I\'ve had more carbs than ideal today. How should I balance my remaining meals?'
-            : 'I need ${carbDiff.abs()}g more carbs. What are good carb sources for my remaining calories?',
+            ? 'My carb intake is a bit high today. What lighter options would help balance my remaining meals?'
+            : 'I could use about ${carbDiff.abs()}g more carbs. What are some good carb sources for my remaining calories?',
       ));
     }
 
@@ -520,7 +539,7 @@ class _CoachScreenState extends State<CoachScreen> {
                         fontWeight: FontWeight.w700)),
                 Text(
                   isPro
-                      ? 'Personalised. Actionable. Built for your goals.'
+                      ? 'Pro insights active · Using your recent meals'
                       : 'Your AI nutrition assistant',
                   style:
                       const TextStyle(color: CLColors.muted, fontSize: 11),
@@ -1505,36 +1524,104 @@ class _RichChatContent extends StatelessWidget {
         continue;
       }
 
-      // ── H2: ## Subheader ──
+      // ── H2: ## Subheader — rendered as section card header ──
       if (line.startsWith('## ')) {
-        widgets.add(Padding(
-          padding: EdgeInsets.only(top: widgets.isNotEmpty ? 8 : 0, bottom: 3),
-          child: Row(
-            children: [
-              Container(
-                width: 3,
-                height: 14,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: CLColors.accent,
-                  borderRadius: BorderRadius.circular(2),
+        // Collect all content lines until next ## or end
+        final sectionTitle = line.substring(3);
+        final sectionLines = <String>[];
+        i++;
+        while (i < lines.length && !lines[i].trim().startsWith('## ') && !lines[i].trim().startsWith('# ')) {
+          sectionLines.add(lines[i]);
+          i++;
+        }
+
+        // Build section content widgets
+        final sectionWidgets = <Widget>[];
+        for (final sLine in sectionLines) {
+          final trimmed = sLine.trim();
+          if (trimmed.isEmpty) {
+            if (sectionWidgets.isNotEmpty) sectionWidgets.add(const SizedBox(height: 4));
+            continue;
+          }
+          if (RegExp(r'^\d+[\.\)]\s').hasMatch(trimmed)) {
+            final numMatch = RegExp(r'^(\d+)[\.\)]\s(.*)').firstMatch(trimmed);
+            if (numMatch != null) {
+              sectionWidgets.add(Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 20, height: 20,
+                      margin: const EdgeInsets.only(right: 6, top: 1),
+                      decoration: BoxDecoration(
+                        color: CLColors.accent.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Center(child: Text(numMatch.group(1)!,
+                        style: const TextStyle(color: CLColors.accent, fontSize: 10, fontWeight: FontWeight.w700))),
+                    ),
+                    Expanded(child: _buildRichLine(numMatch.group(2)!)),
+                  ],
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  line.substring(3),
-                  style: const TextStyle(
-                    color: CLColors.accent,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
+              ));
+              continue;
+            }
+          }
+          if (trimmed.startsWith('- ') || trimmed.startsWith('• ') || trimmed.startsWith('* ')) {
+            sectionWidgets.add(Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 5, height: 5,
+                    margin: const EdgeInsets.only(right: 8, top: 7, left: 3),
+                    decoration: BoxDecoration(color: CLColors.accent.withOpacity(0.5), shape: BoxShape.circle),
                   ),
-                ),
+                  Expanded(child: _buildRichLine(trimmed.substring(2))),
+                ],
               ),
+            ));
+            continue;
+          }
+          sectionWidgets.add(Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1),
+            child: _buildRichLine(trimmed),
+          ));
+        }
+
+        widgets.add(Container(
+          margin: EdgeInsets.only(top: widgets.isNotEmpty ? 8 : 0, bottom: 4),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: CLColors.surface.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: CLColors.border.withOpacity(0.5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 3, height: 14,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(color: CLColors.accent, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  Expanded(
+                    child: Text(sectionTitle,
+                      style: const TextStyle(color: CLColors.accent, fontSize: 14, fontWeight: FontWeight.w600, height: 1.3)),
+                  ),
+                ],
+              ),
+              if (sectionWidgets.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...sectionWidgets,
+              ],
             ],
           ),
         ));
-        i++;
         continue;
       }
 

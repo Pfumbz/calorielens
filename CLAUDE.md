@@ -154,3 +154,13 @@ Edge Functions require the `ANTHROPIC_API_KEY` secret set in Supabase Dashboard 
 - Added barcode scanning: third mode in Scan tab (Photo / Describe / Barcode), uses Open Food Facts API for nutrition lookup, falls back to AI estimation if product not found
 - Added Google Play Billing integration: `in_app_purchase` package, `PurchaseService` singleton in `lib/services/purchase_service.dart`, upgrade modal triggers real purchase flow, Settings links to Play Store subscription management, restore purchases support added
 - Codemagic pre-build script now decodes a release keystore (base64 env var) and imports it as debug.keystore for consistent Google Sign-In SHA-1 across builds
+- Fixed ZA pricing from R79.99 to R48.99 in `lib/utils/pricing.dart`
+- Removed Advanced/Developer section (BYOK API key input) from Settings — backend key management only
+- Fixed Contact Us mailto link with proper `Uri()` constructor and `LaunchMode.externalApplication`
+- Sign-up flow now properly handles Supabase email confirmation (green info message + switch to sign-in mode)
+- Coach responses now rendered as structured section cards (Today's Priority, Recommended Action, etc.)
+- Coach tone softened — supportive language, acknowledges incomplete data, non-judgmental
+- Weekly Report shows "Just starting" state when < 3 days logged — score hidden, encouraging messaging
+- Individual "Log this meal" buttons added to meal plan detail cards (+ icon, logs single meal to diary)
+- Pro status messaging: "Pro insights active" on Coach, "Pro · X left today" on Scan, detailed feature list in Settings
+- Settings Pro section now shows detailed feature checklist with scan usage instead of icon row

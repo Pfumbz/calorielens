@@ -387,27 +387,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
 
-          // Feature icons row — show current tier's features
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-            child: Row(
-              children: isPro
-                  ? [
-                      _featureIcon(Icons.camera_alt_outlined, '${AppState.proScanLimit} scans\nper day', true),
-                      _featureIcon(Icons.auto_awesome, 'Smart meal\nrecommendations', true),
-                      _featureIcon(Icons.bar_chart, 'Weekly\ninsights', true),
-                      _featureIcon(Icons.chat_outlined, 'AI Coach\nhistory', true),
-                      _featureIcon(Icons.block, 'No\nads', true),
-                    ]
-                  : [
-                      _featureIcon(Icons.camera_alt_outlined, '${AppState.freeScanLimit} scans\nper day', false),
-                      _featureIcon(Icons.restaurant_menu, 'Basic\nlogging', false),
-                      _featureIcon(Icons.chat_outlined, 'Limited\ncoach', false),
-                      _featureIcon(Icons.history, '7 day\nhistory', false),
-                      _featureIcon(Icons.auto_awesome, 'Upgrade\nfor more', false),
-                    ],
+          // Feature details — detailed for Pro, icon row for Free
+          if (isPro)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
+                children: [
+                  _proFeatureRow(Icons.camera_alt_outlined, '${AppState.proScanLimit} AI scans per day',
+                    '${state.scansRemainingToday} remaining today'),
+                  _proFeatureRow(Icons.bar_chart, 'Weekly progress reports',
+                    'Detailed nutrition scoring'),
+                  _proFeatureRow(Icons.psychology, 'Smart Coach with meal history',
+                    'Uses your 7-day patterns'),
+                  _proFeatureRow(Icons.restaurant_menu, 'Personalised meal plans',
+                    'AI recommendations & fridge scanner'),
+                  _proFeatureRow(Icons.block, 'Ad-free experience',
+                    'No interruptions'),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+              child: Row(
+                children: [
+                  _featureIcon(Icons.camera_alt_outlined, '${AppState.freeScanLimit} scans\nper day', false),
+                  _featureIcon(Icons.restaurant_menu, 'Basic\nlogging', false),
+                  _featureIcon(Icons.chat_outlined, 'Limited\ncoach', false),
+                  _featureIcon(Icons.history, '7 day\nhistory', false),
+                  _featureIcon(Icons.auto_awesome, 'Upgrade\nfor more', false),
+                ],
+              ),
             ),
-          ),
 
           // Manage subscription / Upgrade row
           const Divider(color: CLColors.border, height: 1),
@@ -461,6 +472,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: active ? CLColors.muted : CLColors.muted2,
               fontSize: 9,
               height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _proFeatureRow(IconData icon, String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, color: CLColors.green, size: 16),
+          const SizedBox(width: 10),
+          Icon(icon, color: CLColors.gold.withOpacity(0.7), size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: CLColors.text, fontSize: 12, fontWeight: FontWeight.w500)),
+                Text(subtitle, style: TextStyle(color: CLColors.muted.withOpacity(0.6), fontSize: 10)),
+              ],
             ),
           ),
         ],

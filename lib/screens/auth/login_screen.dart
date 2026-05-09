@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../app_state.dart';
 import '../../services/auth_service.dart';
 import '../../theme.dart';
@@ -61,26 +62,61 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    // Basic email format check
+    if (!email.contains('@') || !email.contains('.')) {
+      setState(() => _errorMsg = 'Please enter a valid email address.');
+      return;
+    }
+
+    // Password length check for sign-up
+    if (_isSignUp && pw.length < 6) {
+      setState(() => _errorMsg = 'Password must be at least 6 characters.');
+      return;
+    }
+
     setState(() { _loading = true; _errorMsg = null; _infoMsg = null; });
 
-    final result = _isSignUp
-        ? await AuthService.signUpWithEmail(email, pw)
-        : await AuthService.signInWithEmail(email, pw);
+    if (_isSignUp) {
+      // ── Sign-up flow ──
+      final result = await AuthService.signUpWithEmail(email, pw);
+      if (!mounted) return;
+      setState(() => _loading = false);
 
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (result.success) {
-      if (result.user == null) {
-        // Email confirmation required
-        setState(() => _infoMsg = result.error);
-      } else if (_isSignUp) {
-        // Account created and auto-signed in — show brief success before navigation
-        setState(() => _infoMsg = 'Account created! Signing you in...');
+      if (result.success) {
+        if (result.user == null) {
+          // Email confirmation is enabled — user must verify before signing in.
+          // Show the confirmation message and switch to sign-in mode.
+          setState(() {
+            _infoMsg = 'Account created! Check your email for a verification link, then sign in below.';
+            _isSignUp = false; // Switch to sign-in mode so they can sign in after verifying
+            _pwCtrl.clear();
+          });
+        } else {
+          // Email confirmation is disabled — user is signed in immediately.
+          // Show brief feedback, then explicitly trigger cloud sync.
+          // The auth stream in AuthGate will navigate to AppShell.
+          setState(() => _infoMsg = 'Account created! Signing you in...');
+          // Safety net: explicitly trigger onSignIn to ensure cloud sync starts.
+          // AuthGate's StreamBuilder handles the actual navigation.
+          if (mounted) {
+            context.read<AppState>().onSignIn();
+          }
+        }
+      } else {
+        setState(() => _errorMsg = result.error);
       }
-      // main.dart's auth stream will navigate automatically once signed in
     } else {
-      setState(() => _errorMsg = result.error);
+      // ── Sign-in flow ──
+      final result = await AuthService.signInWithEmail(email, pw);
+      if (!mounted) return;
+      setState(() => _loading = false);
+
+      if (result.success) {
+        // Auth stream will navigate automatically.
+        // No message needed — navigation should be near-instant.
+      } else {
+        setState(() => _errorMsg = result.error);
+      }
     }
   }
 

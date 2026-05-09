@@ -347,9 +347,11 @@ class _ScanScreenState extends State<ScanScreen>
                     ? 'Unlimited'
                     : state.isAnonymous
                         ? 'Guest · ${state.scansRemainingToday} left'
-                        : (state.isPremium || state.isSignedIn)
-                            ? '${state.scansRemainingToday} left'
-                            : 'Guest',
+                        : state.isPremium
+                            ? 'Pro · ${state.scansRemainingToday} left today'
+                            : state.isSignedIn
+                                ? '${state.scansRemainingToday} left today'
+                                : 'Guest',
                 style: TextStyle(
                   color: (state.isSignedIn || state.hasApiKey) ? CLColors.text : CLColors.muted,
                   fontSize: 11,

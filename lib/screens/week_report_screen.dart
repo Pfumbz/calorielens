@@ -498,15 +498,19 @@ Output ONLY the 4 lines, nothing else.''';
 
                     // ── Summary cards ────────────────────────────────
                     Row(children: [
-                      _summaryCard(Icons.local_fire_department, 'Avg Daily', avg > 0 ? '$avg' : '—', 'kcal', '7-day average', CLColors.accent),
+                      _summaryCard(Icons.local_fire_department, 'Avg Daily', avg > 0 ? '$avg' : '—', 'kcal',
+                        logged < 3 ? '$logged day${logged == 1 ? '' : 's'} logged' : '7-day average', CLColors.accent),
                       const SizedBox(width: 8),
                       _summaryCard(Icons.trending_up, 'Best Day', best > 0 ? '$best' : '—', 'kcal', bestDayName, CLColors.green),
                     ]),
                     const SizedBox(height: 8),
                     Row(children: [
-                      _summaryCard(Icons.calendar_today, 'Days Logged', '$logged', '/ 7', logged >= 5 ? 'Great consistency!' : 'Keep it up!', CLColors.blue),
+                      _summaryCard(Icons.calendar_today, 'Days Logged', '$logged', '/ 7',
+                        logged >= 5 ? 'Great consistency!' : logged < 3 ? 'Log 3+ for insights' : 'Keep it up!', CLColors.blue),
                       const SizedBox(width: 8),
-                      _summaryCard(Icons.check_circle_outline, 'Goal Hit', '$adherencePercent', '%', 'On logged days', adherencePercent >= 70 ? CLColors.green : CLColors.accent),
+                      _summaryCard(Icons.check_circle_outline, 'Goal Hit', '$adherencePercent', '%',
+                        logged < 3 ? 'On $logged logged day${logged == 1 ? '' : 's'}' : 'On logged days',
+                        adherencePercent >= 70 ? CLColors.green : CLColors.accent),
                     ]),
 
                     const SizedBox(height: 24),
@@ -704,7 +708,12 @@ Output ONLY the 4 lines, nothing else.''';
 
   // ── Score card ─────────────────────────────────────────────────────
   Widget _buildScoreCard(int score, int logged) {
-    final label = _scoreLabel(score);
+    final isLowData = logged < 3;
+    final label = isLowData ? 'Just starting' : _scoreLabel(score);
+    final scoreColor = isLowData
+        ? CLColors.muted
+        : score >= 70 ? CLColors.green : score >= 40 ? CLColors.accent : CLColors.red;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -714,7 +723,7 @@ Output ONLY the 4 lines, nothing else.''';
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: CLColors.accent.withOpacity(0.2)),
+        border: Border.all(color: isLowData ? CLColors.border : CLColors.accent.withOpacity(0.2)),
       ),
       child: Row(
         children: [
@@ -723,20 +732,22 @@ Output ONLY the 4 lines, nothing else.''';
             width: 90, height: 90,
             child: CustomPaint(
               painter: _ScoreRingPainter(
-                progress: score / 100,
-                color: score >= 70 ? CLColors.green : score >= 40 ? CLColors.accent : CLColors.red,
+                progress: isLowData ? 0.0 : score / 100,
+                color: scoreColor,
               ),
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('$score', style: TextStyle(
-                      color: score >= 70 ? CLColors.green : score >= 40 ? CLColors.accent : CLColors.red,
-                      fontSize: 28, fontWeight: FontWeight.w800, height: 1,
-                    )),
-                    const Text('/100', style: TextStyle(color: CLColors.muted, fontSize: 10)),
-                  ],
-                ),
+                child: isLowData
+                    ? Icon(Icons.trending_up, color: CLColors.muted, size: 28)
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('$score', style: TextStyle(
+                            color: scoreColor,
+                            fontSize: 28, fontWeight: FontWeight.w800, height: 1,
+                          )),
+                          const Text('/100', style: TextStyle(color: CLColors.muted, fontSize: 10)),
+                        ],
+                      ),
               ),
             ),
           ),
@@ -749,26 +760,32 @@ Output ONLY the 4 lines, nothing else.''';
                 Row(
                   children: [
                     Flexible(
-                      child: Text(label, style: const TextStyle(color: CLColors.green, fontSize: 16, fontWeight: FontWeight.w600),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      child: Text(label,
+                        style: TextStyle(color: isLowData ? CLColors.muted : CLColors.green, fontSize: 16, fontWeight: FontWeight.w600),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
-                    const SizedBox(width: 4),
-                    const Text('🔥', style: TextStyle(fontSize: 16)),
-                    const SizedBox(width: 4),
-                    const Text('🏆', style: TextStyle(fontSize: 18)),
+                    if (!isLowData) ...[
+                      const SizedBox(width: 4),
+                      const Text('🔥', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 4),
+                      const Text('🏆', style: TextStyle(fontSize: 18)),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  logged >= 5
-                      ? 'Consistency is your superpower.'
-                      : logged > 0
-                          ? 'Log more days for better insights.'
-                          : 'Start logging to see your score.',
+                  isLowData
+                      ? 'Log 3+ days to unlock a reliable nutrition score. Keep going!'
+                      : logged >= 5
+                          ? 'Consistency is your superpower.'
+                          : 'Log more days for better insights.',
                   style: TextStyle(color: CLColors.muted.withOpacity(0.7), fontSize: 12, height: 1.4),
                 ),
                 const SizedBox(height: 6),
-                Text('Nutrition Score', style: TextStyle(color: CLColors.muted.withOpacity(0.5), fontSize: 10)),
+                Text(
+                  isLowData ? 'Preliminary · $logged of 7 days logged' : 'Nutrition Score',
+                  style: TextStyle(color: CLColors.muted.withOpacity(0.5), fontSize: 10),
+                ),
               ],
             ),
           ),

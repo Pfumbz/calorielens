@@ -176,6 +176,7 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
                                 meal: meal, plan: plan),
                           ),
                         ),
+                        onLog: () => _logSingleMeal(context, meal),
                       )),
 
                   const SizedBox(height: 16),
@@ -283,6 +284,29 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
     );
   }
 
+  void _logSingleMeal(BuildContext context, PlanMeal meal) {
+    final state = context.read<AppState>();
+    final now = TimeOfDay.now();
+    state.addEntry(DiaryEntry(
+      id: DateTime.now().millisecondsSinceEpoch,
+      time: '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
+      name: meal.name,
+      calories: meal.calories,
+      protein: meal.protein,
+      carbs: meal.carbs,
+      fat: meal.fat,
+    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${meal.name} logged — ${meal.calories} kcal'),
+        backgroundColor: CLColors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _logAllMeals(BuildContext context) {
     final state = context.read<AppState>();
     final now = TimeOfDay.now();
@@ -317,8 +341,9 @@ class _MealCard extends StatefulWidget {
   final PlanMeal meal;
   final MealPlan plan;
   final VoidCallback onTap;
+  final VoidCallback? onLog;
   const _MealCard(
-      {required this.meal, required this.plan, required this.onTap});
+      {required this.meal, required this.plan, required this.onTap, this.onLog});
 
   @override
   State<_MealCard> createState() => _MealCardState();
@@ -447,7 +472,7 @@ class _MealCardState extends State<_MealCard> {
                 ],
               ),
             ),
-            // Calories
+            // Calories + log button
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -461,9 +486,24 @@ class _MealCardState extends State<_MealCard> {
                         color: CLColors.muted, fontSize: 10)),
               ],
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right,
-                color: CLColors.muted, size: 16),
+            const SizedBox(width: 8),
+            if (widget.onLog != null)
+              GestureDetector(
+                onTap: widget.onLog,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: CLColors.green.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: CLColors.green.withOpacity(0.3)),
+                  ),
+                  child: const Icon(Icons.add, color: CLColors.green, size: 18),
+                ),
+              )
+            else
+              const Icon(Icons.chevron_right,
+                  color: CLColors.muted, size: 16),
           ],
         ),
       ),
