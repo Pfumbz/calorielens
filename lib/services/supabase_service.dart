@@ -114,6 +114,26 @@ class SupabaseService {
     }
   }
 
+  /// Fetch the last [days] days of diary entries (for Pro meal history context).
+  static Future<List<Map<String, dynamic>>> fetchRecentDiary({int days = 7}) async {
+    final user = currentUser;
+    if (user == null) return [];
+    try {
+      final cutoff = DateTime.now().subtract(Duration(days: days));
+      final cutoffDate = cutoff.toIso8601String().split('T')[0];
+      final List<dynamic> data = await client
+          .from('diary_entries')
+          .select()
+          .eq('user_id', user.id)
+          .gte('date', cutoffDate)
+          .order('date')
+          .order('created_at');
+      return data.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Insert a diary entry into the cloud.
   static Future<void> insertDiaryEntry({
     required String date,

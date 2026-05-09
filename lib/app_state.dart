@@ -15,7 +15,6 @@ class AppState extends ChangeNotifier {
   List<DiaryEntry> _diary = [];
   UserProfile _profile = UserProfile();
   int _calorieGoal = 2000;
-  int _water = 0;
   bool _isPremium = false;
   String _apiKey = '';
 
@@ -31,7 +30,6 @@ class AppState extends ChangeNotifier {
   List<DiaryEntry> get diary => _diary;
   UserProfile get profile => _profile;
   int get calorieGoal => _calorieGoal;
-  int get water => _water;
   bool get isPremium => _isPremium;
   String get apiKey => _apiKey;
   User? get supabaseUser => _supabaseUser;
@@ -76,6 +74,30 @@ class AppState extends ChangeNotifier {
   /// Returns a ready-to-use BackendService with the current BYOK key (if any).
   BackendService get backend => BackendService(byokApiKey: _apiKey.isNotEmpty ? _apiKey : null);
 
+  /// Build a 7-day meal history summary for Pro AI context.
+  /// Returns null for non-Pro users (they only get today's context).
+  String? get weeklyMealContext {
+    if (!_isPremium && _apiKey.isEmpty) return null;
+    final week = _storage.getWeekDiaries();
+    final buf = StringBuffer();
+    for (final day in week) {
+      final dateStr = '${day.date.year}-${day.date.month.toString().padLeft(2, '0')}-${day.date.day.toString().padLeft(2, '0')}';
+      if (day.entries.isEmpty) {
+        buf.writeln('$dateStr: No meals logged');
+        continue;
+      }
+      final totalCal = day.entries.fold(0, (s, e) => s + e.calories);
+      final totalP = day.entries.fold(0, (s, e) => s + e.protein);
+      final totalC = day.entries.fold(0, (s, e) => s + e.carbs);
+      final totalF = day.entries.fold(0, (s, e) => s + e.fat);
+      buf.writeln('$dateStr (${totalCal}kcal, P:${totalP}g C:${totalC}g F:${totalF}g):');
+      for (final e in day.entries) {
+        buf.writeln('  - ${e.time} ${e.name}: ${e.calories}kcal (P:${e.protein}g C:${e.carbs}g F:${e.fat}g)');
+      }
+    }
+    return buf.toString().trim();
+  }
+
   // ── Diary retention limits per tier ──────────────────────────────────────
   static const int _guestRetainDays = 3;
   static const int _freeRetainDays = 7;
@@ -97,7 +119,6 @@ class AppState extends ChangeNotifier {
     _diary       = _storage.getDiary();
     _profile     = _storage.profile;
     _calorieGoal = _storage.calorieGoal;
-    _water       = _storage.waterToday;
     _isPremium   = _storage.isPremium;
     _apiKey      = _storage.apiKey;
     _savedPlanIds = _storage.savedPlanIds;
@@ -127,7 +148,6 @@ class AppState extends ChangeNotifier {
     unawaited(NotificationService.checkAndScheduleNudge(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
-      waterGlasses: _water,
     ));
 
     notifyListeners();
@@ -272,7 +292,6 @@ class AppState extends ChangeNotifier {
     unawaited(NotificationService.checkAndScheduleNudge(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
-      waterGlasses: _water,
     ));
 
     notifyListeners();
@@ -287,13 +306,6 @@ class AppState extends ChangeNotifier {
   Future<void> clearAllEntries() async {
     await _storage.saveDiary([]);
     _diary = [];
-    notifyListeners();
-  }
-
-  // ── Water ────────────────────────────────────────────────────────────────
-  Future<void> setWater(int glasses) async {
-    await _storage.saveWater(glasses);
-    _water = glasses;
     notifyListeners();
   }
 

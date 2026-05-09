@@ -164,17 +164,6 @@ class StorageService {
   int get calorieGoal => _prefs.getInt('cl3_goal') ?? 2000;
   Future<void> saveCalorieGoal(int g) => _prefs.setInt('cl3_goal', g);
 
-  // ── Water ─────────────────────────────────────────────────────────
-  int get waterToday {
-    final k = 'cl5_water_${_dateKey(DateTime.now())}';
-    return _prefs.getInt(k) ?? 0;
-  }
-
-  Future<void> saveWater(int glasses) async {
-    final k = 'cl5_water_${_dateKey(DateTime.now())}';
-    await _prefs.setInt(k, glasses);
-  }
-
   // ── Onboarded ─────────────────────────────────────────────────────
   bool get isOnboarded => _prefs.getBool('cl5_onboarded') ?? false;
   Future<void> setOnboarded() => _prefs.setBool('cl5_onboarded', true);

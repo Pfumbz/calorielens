@@ -330,11 +330,9 @@ class NotificationService {
   /// Call this when the app opens or diary changes to check if a nudge is needed.
   /// [caloriesEaten] = total calories logged today
   /// [calorieGoal] = user's daily target
-  /// [waterGlasses] = glasses of water logged today
   static Future<void> checkAndScheduleNudge({
     required int caloriesEaten,
     required int calorieGoal,
-    required int waterGlasses,
   }) async {
     if (!(await nudgesEnabled)) return;
 
@@ -359,11 +357,6 @@ class NotificationService {
         title = 'You\'re ${over} kcal over your goal';
         body = 'No worries — tomorrow is a fresh start. Staying aware is what matters!';
       }
-    }
-    // Water reminder (anytime, if less than 3 glasses by afternoon)
-    else if (now.hour >= 13 && now.hour < 15 && waterGlasses < 3) {
-      title = 'Stay hydrated! 💧';
-      body = 'You\'ve only had $waterGlasses glasses of water today. Try to drink a few more.';
     }
 
     if (title != null && body != null) {

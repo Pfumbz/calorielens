@@ -63,7 +63,6 @@ class _CoachScreenState extends State<CoachScreen> {
         'Consumed: $used kcal | Remaining: ${(goal - used).clamp(0, 9999)} kcal');
     buf.writeln(
         'Protein: ${state.totalProtein}g | Carbs: ${state.totalCarbs}g | Fat: ${state.totalFat}g');
-    buf.writeln('Water: ${state.water}/8 glasses');
     buf.writeln('\nTODAY\'S MEALS:\n$diaryStr');
 
     if (isPro) {
@@ -71,34 +70,49 @@ class _CoachScreenState extends State<CoachScreen> {
           '\n── PRO CONTEXT (use this to give deeper, personalised advice) ──');
 
       final weekData = StorageService().getWeekDiaries();
-      final weekSummary = <String>[];
       int totalWeekCal = 0, daysWithData = 0;
       int totalWeekProtein = 0, totalWeekCarbs = 0, totalWeekFat = 0;
+      final mealFrequency = <String, int>{}; // track repeated meals
 
+      buf.writeln('\n7-DAY MEAL HISTORY:');
       for (final day in weekData) {
         final cal = day.entries.fold<int>(0, (s, e) => s + e.calories);
         final pro = day.entries.fold<int>(0, (s, e) => s + e.protein);
         final carb = day.entries.fold<int>(0, (s, e) => s + e.carbs);
         final fat = day.entries.fold<int>(0, (s, e) => s + e.fat);
+        final dateLabel = '${day.date.month}/${day.date.day}';
         if (day.entries.isNotEmpty) {
           daysWithData++;
           totalWeekCal += cal;
           totalWeekProtein += pro;
           totalWeekCarbs += carb;
           totalWeekFat += fat;
-          weekSummary.add(
-              '${day.date.month}/${day.date.day}: ${day.entries.length} meals, $cal kcal (P:${pro}g C:${carb}g F:${fat}g)');
+          buf.writeln('$dateLabel ($cal kcal, P:${pro}g C:${carb}g F:${fat}g):');
+          for (final e in day.entries) {
+            buf.writeln('  - ${e.time} ${e.name}: ${e.calories}kcal (P:${e.protein}g C:${e.carbs}g F:${e.fat}g)');
+            // Track meal frequency for pattern detection
+            final normalized = e.name.toLowerCase().trim();
+            mealFrequency[normalized] = (mealFrequency[normalized] ?? 0) + 1;
+          }
+        } else {
+          buf.writeln('$dateLabel: No meals logged');
         }
       }
 
       if (daysWithData > 0) {
-        buf.writeln('\n7-DAY HISTORY:');
-        for (final s in weekSummary) {
-          buf.writeln(s);
-        }
         final avgCal = totalWeekCal ~/ daysWithData;
         buf.writeln(
             '\nWeekly avg ($daysWithData days): $avgCal kcal/day, P:${totalWeekProtein ~/ daysWithData}g C:${totalWeekCarbs ~/ daysWithData}g F:${totalWeekFat ~/ daysWithData}g');
+
+        // Surface repeated meals as patterns
+        final repeats = mealFrequency.entries.where((e) => e.value >= 2).toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        if (repeats.isNotEmpty) {
+          buf.writeln('\nFREQUENT MEALS (patterns):');
+          for (final r in repeats.take(5)) {
+            buf.writeln('  ${r.key}: ${r.value}x this week');
+          }
+        }
       }
 
       if (p.weight > 0) {
@@ -109,7 +123,7 @@ class _CoachScreenState extends State<CoachScreen> {
       }
 
       buf.writeln(
-          '\nYou are the user\'s PRO Smart Coach. Be direct and action-oriented. Tell them exactly what to eat, not just advice. Reference their weekly patterns. Keep answers focused and under 200 words.\nFormat your responses with markdown: use ## for section headers, **bold** for key numbers and food names, numbered lists for steps, and bullet points for options. This makes responses easy to scan.');
+          '\nYou are the user\'s PRO Smart Coach. Be direct and action-oriented. Tell them exactly what to eat, not just advice. Reference their weekly patterns and specific meals they\'ve logged. Identify trends (e.g. "you\'ve been low on protein 4 out of 7 days" or "rice appears 5 times this week — try varying your carb sources"). Keep answers focused and under 200 words.\nFormat your responses with markdown: use ## for section headers, **bold** for key numbers and food names, numbered lists for steps, and bullet points for options. This makes responses easy to scan.');
     } else {
       buf.writeln(
           '\nBe concise and practical. Keep responses under 120 words. Use **bold** for key numbers, bullet points for lists. If they ask about detailed analysis, mention Smart Coach Pro gives deeper personalised insights.');
