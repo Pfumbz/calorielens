@@ -13,7 +13,7 @@ import 'supabase_service.dart';
 ///   1. If user has a BYOK (bring-your-own-key) API key in Settings
 ///      → call Anthropic directly (they pay their own costs, no limits)
 ///   2. Otherwise → proxy through our Supabase Edge Functions
-///      • Rate limits enforced server-side (10 scans/day, 15 chats/day)
+///      • Rate limits enforced server-side (5 scans/day free, 50 Pro; 15 chats/day)
 ///      • Returns 429 with a user-friendly message if limit hit
 /// ─────────────────────────────────────────────────────────────────────────────
 class BackendService {
@@ -198,6 +198,6 @@ class BackendService {
   }
 
   String _defaultLimitMessage(bool isScan) => isScan
-      ? 'You\'ve used all 10 free scans for today. Upgrade to Pro for unlimited scanning.'
-      : 'You\'ve used all 15 free coach messages for today. Upgrade to Pro for unlimited coaching.';
+      ? 'You\'ve used all your free scans for today. Upgrade to Pro for up to 50 scans/day.'
+      : 'You\'ve used all your free coach messages for today. Upgrade to Pro for unlimited coaching.';
 }

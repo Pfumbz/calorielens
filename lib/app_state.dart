@@ -49,17 +49,17 @@ class AppState extends ChangeNotifier {
   int get caloriesLeft  => (_calorieGoal - totalCalories).clamp(0, 9999);
   bool get hasApiKey    => _apiKey.isNotEmpty;
 
-  // Scan limits per tier
-  static const int _guestScanLimit = 3;
-  static const int _freeScanLimit = 5;
-  static const int _proScanLimit = 50;
+  // Scan limits per tier (public for UI copy)
+  static const int guestScanLimit = 3;
+  static const int freeScanLimit = 5;
+  static const int proScanLimit = 50;
 
   /// Remaining AI scans today (shown in UI).
   int get scansRemainingToday {
     if (_apiKey.isNotEmpty) return 999; // BYOK = unlimited
-    if (_isPremium) return (_proScanLimit - _backendScansToday).clamp(0, _proScanLimit);
-    if (isAnonymous) return (_guestScanLimit - _backendScansToday).clamp(0, _guestScanLimit);
-    if (isSignedIn) return (_freeScanLimit - _backendScansToday).clamp(0, _freeScanLimit);
+    if (_isPremium) return (proScanLimit - _backendScansToday).clamp(0, proScanLimit);
+    if (isAnonymous) return (guestScanLimit - _backendScansToday).clamp(0, guestScanLimit);
+    if (isSignedIn) return (freeScanLimit - _backendScansToday).clamp(0, freeScanLimit);
     return 0; // not signed in at all
   }
 
@@ -67,9 +67,9 @@ class AppState extends ChangeNotifier {
   /// Note: backend enforces the real limit (429 response). This is for UI gating.
   bool get canScan {
     if (_apiKey.isNotEmpty) return true; // BYOK = unlimited
-    if (_isPremium) return _backendScansToday < _proScanLimit;
-    if (isAnonymous) return _backendScansToday < _guestScanLimit;
-    if (isSignedIn) return _backendScansToday < _freeScanLimit;
+    if (_isPremium) return _backendScansToday < proScanLimit;
+    if (isAnonymous) return _backendScansToday < guestScanLimit;
+    if (isSignedIn) return _backendScansToday < freeScanLimit;
     return false; // not signed in at all
   }
 

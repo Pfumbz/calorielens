@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app_state.dart';
 import '../../services/auth_service.dart';
 import '../../theme.dart';
 
@@ -201,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen>
         const SizedBox(height: 6),
         Text(
           _isSignUp
-              ? 'Sign up for free — 5 AI scans/day included'
+              ? 'Sign up for free — ${AppState.freeScanLimit} AI scans/day included'
               : 'Sign in to sync your meals and unlock AI features',
           style: const TextStyle(color: CLColors.muted, fontSize: 13, height: 1.4),
         ),
@@ -395,7 +396,7 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           if (!isMidSession)
             const Text(
-              '3 free AI scans/day · no sync',
+              '${AppState.guestScanLimit} free AI scans/day · no sync',
               style: TextStyle(color: CLColors.muted2, fontSize: 11),
             ),
         ],

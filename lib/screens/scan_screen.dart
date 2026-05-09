@@ -88,7 +88,24 @@ class _ScanScreenState extends State<ScanScreen>
       });
     } catch (e) {
       debugPrint('Image pick error: $e');
-      await _recoverLostImage();
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('permission') ||
+          errStr.contains('denied') ||
+          errStr.contains('photo_access_denied') ||
+          errStr.contains('camera_access_denied')) {
+        if (!mounted) return;
+        final sourceName = source == ImageSource.camera ? 'Camera' : 'Photo library';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$sourceName access denied. Please enable it in your device settings.'),
+            backgroundColor: CLColors.surface2,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      } else {
+        await _recoverLostImage();
+      }
     }
   }
 
@@ -256,25 +273,28 @@ class _ScanScreenState extends State<ScanScreen>
   Widget _buildHeader(AppState state) {
     return Row(
       children: [
-        // CalorieLens branding
-        RichText(
-          text: const TextSpan(
-            style: TextStyle(
-              fontFamily: 'serif',
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: CLColors.text,
-            ),
-            children: [
-              TextSpan(text: 'Calorie'),
-              TextSpan(
-                text: 'Lens',
-                style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+        // CalorieLens branding — flexible to shrink on narrow screens
+        Flexible(
+          child: RichText(
+            overflow: TextOverflow.ellipsis,
+            text: const TextSpan(
+              style: TextStyle(
+                fontFamily: 'serif',
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: CLColors.text,
               ),
-            ],
+              children: [
+                TextSpan(text: 'Calorie'),
+                TextSpan(
+                  text: 'Lens',
+                  style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 8),
         // PRO badge
         if (state.isPremium)
           Container(

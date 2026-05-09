@@ -365,7 +365,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text(
                           isPro
                               ? "You're enjoying all Pro features"
-                              : '5 scans/day · limited features',
+                              : '${AppState.freeScanLimit} scans/day · limited features',
                           style: const TextStyle(
                               color: CLColors.muted, fontSize: 11),
                         ),
@@ -399,17 +399,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
 
-          // Feature icons row
+          // Feature icons row — show current tier's features
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
             child: Row(
-              children: [
-                _featureIcon(Icons.camera_alt_outlined, '50 scans\nper day', isPro),
-                _featureIcon(Icons.auto_awesome, 'Smart meal\nrecommendations', isPro),
-                _featureIcon(Icons.bar_chart, 'Weekly\ninsights', isPro),
-                _featureIcon(Icons.chat_outlined, 'AI Coach\nhistory', isPro),
-                _featureIcon(Icons.block, 'No\nads', isPro),
-              ],
+              children: isPro
+                  ? [
+                      _featureIcon(Icons.camera_alt_outlined, '${AppState.proScanLimit} scans\nper day', true),
+                      _featureIcon(Icons.auto_awesome, 'Smart meal\nrecommendations', true),
+                      _featureIcon(Icons.bar_chart, 'Weekly\ninsights', true),
+                      _featureIcon(Icons.chat_outlined, 'AI Coach\nhistory', true),
+                      _featureIcon(Icons.block, 'No\nads', true),
+                    ]
+                  : [
+                      _featureIcon(Icons.camera_alt_outlined, '${AppState.freeScanLimit} scans\nper day', false),
+                      _featureIcon(Icons.restaurant_menu, 'Basic\nlogging', false),
+                      _featureIcon(Icons.chat_outlined, 'Limited\ncoach', false),
+                      _featureIcon(Icons.history, '7 day\nhistory', false),
+                      _featureIcon(Icons.auto_awesome, 'Upgrade\nfor more', false),
+                    ],
             ),
           ),
 

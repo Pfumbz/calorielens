@@ -88,7 +88,9 @@ class _UpgradeModalState extends State<UpgradeModal> {
   String get _contextMessage {
     switch (widget.source) {
       case 'scan_limit':
-        return "You've used all 5 free scans for today. Upgrade to Pro for up to 50 scans/day — never miss logging a meal.";
+        final state = context.read<AppState>();
+        final limit = state.isAnonymous ? AppState.guestScanLimit : AppState.freeScanLimit;
+        return "You've used all $limit free scans for today. Upgrade to Pro for up to ${AppState.proScanLimit} scans/day — never miss logging a meal.";
       case 'week_report':
         return "The Weekly Progress Report is a Pro feature. Unlock your full 7-day analysis with trends and AI insights.";
       case 'budget_coach':
@@ -161,29 +163,15 @@ class _UpgradeModalState extends State<UpgradeModal> {
     final purchases = context.read<AppState>().purchases;
 
     if (!purchases.storeAvailable || !purchases.hasProduct) {
-      // Store not available or product not loaded — fall back to
-      // manual activation (for development/testing only)
-      if (!purchases.storeAvailable) {
-        // In development builds, allow manual activation for testing
-        await context.read<AppState>().activatePremium();
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Pro activated (dev mode). Connect Play Store for real billing.'),
-              backgroundColor: CLColors.gold,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Product not loaded yet
+      if (!mounted) return;
+      // Store not available or product not loaded — inform the user
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Subscription loading... please try again in a moment.'),
+          content: Text(
+            !purchases.storeAvailable
+                ? 'Google Play is not available on this device. Subscriptions require Google Play.'
+                : 'Subscription loading... please try again in a moment.',
+          ),
           backgroundColor: CLColors.surface,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -344,8 +332,8 @@ class _UpgradeModalState extends State<UpgradeModal> {
     );
   }
 
-  static const _features = [
-    'Up to 50 meal scans per day',
+  static final _features = [
+    'Up to ${AppState.proScanLimit} meal scans per day',
     'AI-generated personalised meal plans',
     'Fridge Scanner — snap & get recipe ideas',
     'AI Smart Coach — personalised meal advice',

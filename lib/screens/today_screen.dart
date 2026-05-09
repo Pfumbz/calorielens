@@ -483,37 +483,108 @@ class TodayScreen extends StatelessWidget {
         child: const Icon(Icons.delete_outline, color: CLColors.red),
       ),
       onDismissed: (_) => context.read<AppState>().removeEntry(e.id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: CLColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: CLColors.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(e.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: CLColors.text, fontSize: 14, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 3),
-                  Text('${e.time} · P:${e.protein}g  C:${e.carbs}g  F:${e.fat}g',
-                      style: const TextStyle(color: CLColors.muted, fontSize: 11)),
-                ],
+      child: GestureDetector(
+        onTap: () => _showEntryDetail(context, e),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: CLColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: CLColors.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(e.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: CLColors.text, fontSize: 14, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 3),
+                    Text('${e.time} · P:${e.protein}g  C:${e.carbs}g  F:${e.fat}g',
+                        style: const TextStyle(color: CLColors.muted, fontSize: 11)),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
+              Text('${e.calories}',
+                  style: const TextStyle(color: CLColors.accent, fontSize: 16, fontWeight: FontWeight.w700)),
+              const Text(' kcal', style: TextStyle(color: CLColors.muted, fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEntryDetail(BuildContext context, DiaryEntry e) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: CLColors.border, borderRadius: BorderRadius.circular(2)),
             ),
-            const SizedBox(width: 8),
-            Text('${e.calories}',
-                style: const TextStyle(color: CLColors.accent, fontSize: 16, fontWeight: FontWeight.w700)),
-            const Text(' kcal', style: TextStyle(color: CLColors.muted, fontSize: 11)),
+            const SizedBox(height: 20),
+            // Meal name
+            Text(e.name,
+                style: const TextStyle(color: CLColors.text, fontSize: 18, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text('Logged at ${e.time}',
+                style: const TextStyle(color: CLColors.muted, fontSize: 12)),
+            const SizedBox(height: 20),
+            // Calories hero
+            Text('${e.calories}', style: const TextStyle(color: CLColors.accent, fontSize: 40, fontWeight: FontWeight.w800)),
+            const Text('calories', style: TextStyle(color: CLColors.muted, fontSize: 13)),
+            const SizedBox(height: 20),
+            // Macro row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _macroColumn('Protein', '${e.protein}g', CLColors.green),
+                _macroColumn('Carbs', '${e.carbs}g', CLColors.accent),
+                _macroColumn('Fat', '${e.fat}g', CLColors.gold),
+                if (e.fiber > 0) _macroColumn('Fiber', '${e.fiber}g', CLColors.muted),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Delete button
+            TextButton.icon(
+              onPressed: () {
+                context.read<AppState>().removeEntry(e.id);
+                Navigator.pop(context);
+              },
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('Remove entry'),
+              style: TextButton.styleFrom(foregroundColor: CLColors.red),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _macroColumn(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(color: CLColors.muted, fontSize: 11)),
+      ],
     );
   }
 

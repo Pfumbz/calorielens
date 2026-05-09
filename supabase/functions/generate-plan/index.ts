@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 const GUEST_SCAN_LIMIT = 3  // scans per day for anonymous guests
-const FREE_SCAN_LIMIT = 10  // shared with scans — generating a plan costs 1 scan credit
+const FREE_SCAN_LIMIT = 5   // shared with scans — generating a plan costs 1 scan credit
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
