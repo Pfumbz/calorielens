@@ -149,6 +149,9 @@ class _LoginScreenState extends State<LoginScreen>
       setState(() => _loading = false);
 
       if (result.success) {
+        if (mounted) {
+          context.read<AppState>().onSignIn();
+        }
         if (mounted && _isFromSettings) {
           Navigator.of(context).pop();
         }
@@ -174,6 +177,9 @@ class _LoginScreenState extends State<LoginScreen>
     if (!mounted) return;
     setState(() => _loading = false);
     if (result.success) {
+      if (mounted) {
+        context.read<AppState>().onSignIn();
+      }
       if (mounted && _isFromSettings) {
         Navigator.of(context).pop();
       }
