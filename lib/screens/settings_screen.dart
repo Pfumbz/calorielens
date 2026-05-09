@@ -17,11 +17,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // API key (advanced)
-  final _keyCtrl = TextEditingController();
-  bool _keyVisible = false;
-  bool _showAdvanced = false;
-
   // Notification state
   bool _remindersOn = false;
   bool _nudgesOn = false;
@@ -32,8 +27,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    final state = context.read<AppState>();
-    _keyCtrl.text = state.apiKey;
     _loadNotificationPrefs();
   }
 
@@ -56,7 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    _keyCtrl.dispose();
     super.dispose();
   }
 
@@ -101,10 +93,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _sectionLabel('PROFILE'),
               const SizedBox(height: 8),
               _buildProfileRow(state),
-              const SizedBox(height: 24),
-
-              // ── ADVANCED (hidden) ────────────────────────────
-              _buildAdvancedToggle(state),
               const SizedBox(height: 24),
 
               // ── ABOUT ────────────────────────────────────────
@@ -917,136 +905,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // ── ADVANCED / DEVELOPER ───────────────────────────────────────────
-  // ═══════════════════════════════════════════════════════════════════════
-  Widget _buildAdvancedToggle(AppState state) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _showAdvanced = !_showAdvanced),
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: CLColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: CLColors.border),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.code, color: CLColors.muted, size: 18),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text('Advanced / Developer',
-                      style: TextStyle(
-                          color: CLColors.muted, fontSize: 13)),
-                ),
-                Icon(
-                  _showAdvanced
-                      ? Icons.expand_less
-                      : Icons.expand_more,
-                  color: CLColors.muted,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_showAdvanced) ...[
-          const SizedBox(height: 14),
-          _buildApiKeySection(state),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildApiKeySection(AppState state) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: CLColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: CLColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('API Key (Power Users)',
-              style: TextStyle(
-                  color: CLColors.text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          const Text(
-              'Add your own Anthropic key for unlimited direct access.',
-              style: TextStyle(
-                  color: CLColors.muted,
-                  fontSize: 11,
-                  height: 1.4)),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _keyCtrl,
-            obscureText: !_keyVisible,
-            style: const TextStyle(
-                color: CLColors.text,
-                fontSize: 13,
-                fontFamily: 'monospace'),
-            decoration: InputDecoration(
-              hintText: 'sk-ant-api03-…',
-              suffixIcon: IconButton(
-                icon: Icon(
-                    _keyVisible
-                        ? Icons.visibility_off
-                        : Icons.visibility,
-                    color: CLColors.muted,
-                    size: 18),
-                onPressed: () =>
-                    setState(() => _keyVisible = !_keyVisible),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    await context
-                        .read<AppState>()
-                        .saveApiKey(_keyCtrl.text.trim());
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('API key saved'),
-                            behavior: SnackBarBehavior.floating),
-                      );
-                    }
-                  },
-                  child: const Text('SAVE KEY'),
-                ),
-              ),
-              if (state.hasApiKey) ...[
-                const SizedBox(width: 10),
-                TextButton(
-                  onPressed: () async {
-                    _keyCtrl.clear();
-                    await context
-                        .read<AppState>()
-                        .saveApiKey('');
-                  },
-                  style: TextButton.styleFrom(
-                      foregroundColor: CLColors.red),
-                  child: const Text('Remove'),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
   // ── ABOUT SECTION ──────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
   static const _privacyPolicyUrl =
@@ -1074,8 +932,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.mail_outline,
             label: 'Contact Us',
             labelColor: CLColors.text,
-            onTap: () =>
-                launchUrl(Uri.parse('mailto:makhuvhap.c@gmail.com')),
+            onTap: () async {
+              final uri = Uri(
+                scheme: 'mailto',
+                path: 'makhuvhap.c@gmail.com',
+                queryParameters: {
+                  'subject': 'CalorieLens Feedback',
+                },
+              );
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('No email app found. Reach us at makhuvhap.c@gmail.com'),
+                      backgroundColor: CLColors.surface,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              }
+            },
           ),
         ],
       ),

@@ -31,7 +31,7 @@ PricingInfo getLocalPricing() {
 /// Country code → pricing details
 const Map<String, PricingInfo> _pricingMap = {
   // ── Africa ──────────────────────────────────────────────────────────────
-  'ZA': PricingInfo(symbol: 'R',    amount: '79.99',   currency: 'ZAR', fullPrice: 'R79.99/month',     countryCode: 'ZA'),
+  'ZA': PricingInfo(symbol: 'R',    amount: '48.99',   currency: 'ZAR', fullPrice: 'R48.99/month',     countryCode: 'ZA'),
   'NG': PricingInfo(symbol: '₦',   amount: '3,999',   currency: 'NGN', fullPrice: '₦3,999/month',     countryCode: 'NG'),
   'KE': PricingInfo(symbol: 'KSh', amount: '649',     currency: 'KES', fullPrice: 'KSh649/month',     countryCode: 'KE'),
   'GH': PricingInfo(symbol: 'GH₵', amount: '59.99',   currency: 'GHS', fullPrice: 'GH₵59.99/month',   countryCode: 'GH'),
