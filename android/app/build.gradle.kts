@@ -28,9 +28,26 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("CM_KEYSTORE_PATH") ?: System.getenv("FCI_KEYSTORE_PATH")
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: System.getenv("FCI_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("CM_KEY_ALIAS") ?: System.getenv("FCI_KEY_ALIAS")
+                keyPassword = System.getenv("CM_KEY_PASSWORD") ?: System.getenv("FCI_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            val keystorePath = System.getenv("CM_KEYSTORE_PATH") ?: System.getenv("FCI_KEYSTORE_PATH")
+            signingConfig = if (keystorePath != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
