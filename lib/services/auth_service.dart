@@ -35,10 +35,14 @@ class AuthService {
   ) async {
     try {
       final res = await _client.auth.signUp(email: email, password: password);
-      if (res.user != null) {
+      // Supabase returns res.user even when email confirmation is enabled,
+      // but res.session is null until the user confirms their email.
+      // So we check session to know if the user is actually signed in.
+      if (res.session != null) {
+        // Email confirmation disabled — user is signed in immediately
         return AuthResult(success: true, user: res.user);
       }
-      // Email confirmation required
+      // Email confirmation required — user created but not signed in
       return AuthResult(
         success: true,
         user: null,
@@ -157,11 +161,23 @@ class AuthService {
   static String _friendlyError(String raw) {
     final lower = raw.toLowerCase();
     if (lower.contains('invalid login')) return 'Incorrect email or password.';
-    if (lower.contains('already registered')) return 'An account with this email already exists.';
-    if (lower.contains('password should be')) return 'Password must be at least 6 characters.';
+    if (lower.contains('already registered') || lower.contains('user already registered')) {
+      return 'This email already has an account. Try signing in instead.';
+    }
+    if (lower.contains('password should be') || lower.contains('weak password')) {
+      return 'Password must be at least 6 characters.';
+    }
     if (lower.contains('invalid email')) return 'Please enter a valid email address.';
     if (lower.contains('email not confirmed')) return 'Please confirm your email before signing in.';
-    if (lower.contains('network')) return 'No internet connection. Check your network and try again.';
+    if (lower.contains('rate limit') || lower.contains('too many requests') || lower.contains('email rate limit')) {
+      return 'Too many attempts. Please wait a few minutes and try again.';
+    }
+    if (lower.contains('network') || lower.contains('socket') || lower.contains('timeout') || lower.contains('connection')) {
+      return 'Could not connect. Check your internet and try again.';
+    }
+    if (lower.contains('signups not allowed') || lower.contains('signup is disabled')) {
+      return 'Sign-ups are temporarily unavailable. Please try again later.';
+    }
     return raw;
   }
 }
