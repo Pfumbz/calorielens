@@ -290,88 +290,75 @@ class _ScanScreenState extends State<ScanScreen>
   Widget _buildHeader(AppState state) {
     return Row(
       children: [
-        // CalorieLens branding — flexible to shrink on narrow screens
-        Flexible(
-          child: RichText(
-            overflow: TextOverflow.ellipsis,
-            text: const TextSpan(
-              style: TextStyle(
-                fontFamily: 'serif',
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: CLColors.text,
-              ),
-              children: [
-                TextSpan(text: 'Calorie'),
-                TextSpan(
-                  text: 'Lens',
-                  style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
-                ),
-              ],
+        // CalorieLens branding
+        RichText(
+          text: const TextSpan(
+            style: TextStyle(
+              fontFamily: 'serif',
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: CLColors.text,
             ),
+            children: [
+              TextSpan(text: 'Calorie'),
+              TextSpan(
+                text: 'Lens',
+                style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 8),
-        // PRO badge
-        if (state.isPremium)
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFF433510), Color(0xFF2A1A04)]),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: CLColors.gold.withOpacity(0.5)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.star, color: CLColors.gold, size: 12),
-                const SizedBox(width: 4),
-                const Text('PRO',
-                    style: TextStyle(color: CLColors.gold, fontSize: 10,
-                        fontWeight: FontWeight.w800, letterSpacing: 1)),
-              ],
-            ),
-          ),
-        // Scan counter pill
+        const Spacer(),
+        // Status pill — combines PRO badge + scan count into one element
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: CLColors.surface,
+            color: state.isPremium
+                ? const Color(0xFF2A1A04)
+                : CLColors.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: (state.isSignedIn || state.hasApiKey)
-                  ? CLColors.green.withOpacity(0.4)
-                  : CLColors.border,
+              color: state.isPremium
+                  ? CLColors.gold.withOpacity(0.5)
+                  : (state.isSignedIn || state.hasApiKey)
+                      ? CLColors.green.withOpacity(0.4)
+                      : CLColors.border,
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 6, height: 6,
-                decoration: BoxDecoration(
-                  color: (state.isPremium || state.hasApiKey)
-                      ? CLColors.green
-                      : (state.isSignedIn && !state.isAnonymous) ? CLColors.green : CLColors.gold,
-                  shape: BoxShape.circle,
+              if (state.isPremium) ...[
+                Icon(Icons.star, color: CLColors.gold, size: 12),
+                const SizedBox(width: 5),
+              ] else ...[
+                Container(
+                  width: 6, height: 6,
+                  decoration: BoxDecoration(
+                    color: state.hasApiKey
+                        ? CLColors.green
+                        : (state.isSignedIn && !state.isAnonymous) ? CLColors.green : CLColors.gold,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
+                const SizedBox(width: 6),
+              ],
               Text(
                 state.hasApiKey
                     ? 'Unlimited'
                     : state.isAnonymous
                         ? 'Guest · ${state.scansRemainingToday} left'
                         : state.isPremium
-                            ? 'Pro · ${state.scansRemainingToday} left today'
+                            ? 'PRO · ${state.scansRemainingToday} left'
                             : state.isSignedIn
                                 ? '${state.scansRemainingToday} left today'
                                 : 'Guest',
                 style: TextStyle(
-                  color: (state.isSignedIn || state.hasApiKey) ? CLColors.text : CLColors.muted,
+                  color: state.isPremium
+                      ? CLColors.gold
+                      : (state.isSignedIn || state.hasApiKey) ? CLColors.text : CLColors.muted,
                   fontSize: 11,
+                  fontWeight: state.isPremium ? FontWeight.w700 : FontWeight.normal,
                 ),
               ),
             ],
