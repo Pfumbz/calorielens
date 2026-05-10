@@ -20,11 +20,9 @@ class _AdBannerState extends State<AdBanner> {
 
   static String get _adUnitId {
     if (Platform.isAndroid) {
-      // TODO: Switch back to production ID once app is on Play Store
-      // Production: 'ca-app-pub-5237846834490979/9754446561'
-      return 'ca-app-pub-3940256099942544/6300978111'; // Android test banner
+      return 'ca-app-pub-5237846834490979/9754446561'; // Android production banner
     } else {
-      return 'ca-app-pub-3940256099942544/2934735716'; // iOS test banner
+      return 'ca-app-pub-3940256099942544/2934735716'; // iOS test banner (update when iOS goes live)
     }
   }
 
