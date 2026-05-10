@@ -17,6 +17,12 @@ enum _ScanMode { photo, text, barcode }
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
+  /// Whether the scan screen currently has a result showing (used by AppShell for back nav).
+  static bool hasResult = false;
+
+  /// Clears the result and goes back to scan input (called by AppShell on back press).
+  static VoidCallback? clearResult;
+
   @override
   State<ScanScreen> createState() => _ScanScreenState();
 }
@@ -58,10 +64,15 @@ class _ScanScreenState extends State<ScanScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _resultAnim, curve: Curves.easeOut));
     _recoverLostImage();
+
+    // Wire up static callbacks for AppShell back-button handling
+    ScanScreen.clearResult = _discardResult;
   }
 
   @override
   void dispose() {
+    ScanScreen.clearResult = null;
+    ScanScreen.hasResult = false;
     _textCtrl.dispose();
     _barcodeNameCtrl.dispose();
     _resultAnim.dispose();
@@ -150,7 +161,7 @@ class _ScanScreenState extends State<ScanScreen>
         res = await svc.scanImage(_imageBytes!, _mediaType);
       }
       await state.trackScan();
-      setState(() => _result = res);
+      setState(() { _result = res; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
     } catch (e) {
       setState(
@@ -199,6 +210,11 @@ class _ScanScreenState extends State<ScanScreen>
     }
   }
 
+  /// Update static hasResult flag whenever _result changes
+  void _updateResultFlag() {
+    ScanScreen.hasResult = _result != null || _barcodeResult != null;
+  }
+
   void _discardResult() {
     setState(() {
       _result = null;
@@ -208,6 +224,7 @@ class _ScanScreenState extends State<ScanScreen>
       _barcodeScanned = false;
       _scannedBarcode = null;
       _barcodeResult = null;
+      _updateResultFlag();
     });
     _resultAnim.reset();
   }
@@ -686,13 +703,13 @@ class _ScanScreenState extends State<ScanScreen>
       final result = await OpenFoodFactsService.lookup(barcode);
       if (!mounted) return;
       if (result != null && result.nutrition != null) {
-        setState(() { _barcodeResult = result; _result = result.nutrition; _loading = false; });
+        setState(() { _barcodeResult = result; _result = result.nutrition; _loading = false; _updateResultFlag(); });
         _resultAnim.forward(from: 0);
       } else if (result != null && result.productName.isNotEmpty) {
-        setState(() { _barcodeResult = result; _loading = false; });
+        setState(() { _barcodeResult = result; _loading = false; _updateResultFlag(); });
         _aiEstimateFromBarcode(result.displayName);
       } else {
-        setState(() { _barcodeResult = result; _loading = false; });
+        setState(() { _barcodeResult = result; _loading = false; _updateResultFlag(); });
       }
     } catch (e) {
       if (!mounted) return;
@@ -706,7 +723,7 @@ class _ScanScreenState extends State<ScanScreen>
       final state = Provider.of<AppState>(context, listen: false);
       final result = await state.backend.scanText(productDescription);
       if (!mounted) return;
-      setState(() { _result = result; _loading = false; });
+      setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
       await state.trackScan();
     } catch (e) {
@@ -940,12 +957,12 @@ class _ScanScreenState extends State<ScanScreen>
 
   Future<void> _reAnalyse(List<String> items) async {
     final description = items.join(', ');
-    setState(() { _loading = true; _result = null; });
+    setState(() { _loading = true; _result = null; _updateResultFlag(); });
     _resultAnim.reset();
     try {
       final state = Provider.of<AppState>(context, listen: false);
       final result = await state.backend.scanText(description);
-      setState(() { _result = result; _loading = false; });
+      setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
       await state.trackScan();
     } catch (e) {

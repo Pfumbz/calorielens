@@ -72,8 +72,21 @@ class TodayScreen extends StatelessWidget {
               const SizedBox(height: 10),
               if (state.diary.isEmpty)
                 _buildEmptyState(context)
-              else
+              else ...[
                 _buildDiaryListWithAd(context, state, isPro),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.swipe_left_outlined, size: 13, color: CLColors.muted2),
+                    SizedBox(width: 5),
+                    Text(
+                      'Swipe left on a meal to delete it',
+                      style: TextStyle(color: CLColors.muted2, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 80),
             ],
           ),

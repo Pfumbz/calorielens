@@ -418,14 +418,23 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Back button can only exit when on Scan tab with no results showing
+    final canExitApp = _currentIndex == 0 && !ScanScreen.hasResult;
+
     return PopScope(
-      canPop: _currentIndex == 0,
+      canPop: canExitApp,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          // If on Coach tab with active chat, clear chat first (back to dashboard)
-          if (_currentIndex == 2 && CoachScreen.hasChatMessages) {
+          // Priority 1: If scan results are showing, clear them first
+          if (_currentIndex == 0 && ScanScreen.hasResult) {
+            ScanScreen.clearResult?.call();
+          }
+          // Priority 2: If on Coach tab with active chat, clear chat first
+          else if (_currentIndex == 2 && CoachScreen.hasChatMessages) {
             CoachScreen.clearChat?.call();
-          } else {
+          }
+          // Priority 3: Any non-Scan tab → go back to Scan
+          else {
             setState(() => _currentIndex = 0);
           }
         }
