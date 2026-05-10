@@ -276,25 +276,9 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildLogo() {
     return Row(
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE07B39), Color(0xFF8B4513)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: CLColors.accent.withOpacity(0.4),
-                blurRadius: 14,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: const Icon(Icons.camera_alt, color: Colors.white, size: 22),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset('assets/logo_small.png', width: 44, height: 44),
         ),
         const SizedBox(width: 12),
         RichText(

@@ -119,16 +119,11 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo icon
+                // Logo
                 Container(
                   width: 88,
                   height: 88,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE07B39), Color(0xFF8B4513)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
@@ -138,8 +133,10 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.camera_alt,
-                      color: Colors.white, size: 40),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset('assets/logo.png', width: 88, height: 88),
+                  ),
                 ),
                 const SizedBox(height: 22),
                 // App name

@@ -210,6 +210,11 @@ class _UpgradeModalState extends State<UpgradeModal> {
           // Logo + PRO chip
           Row(
             children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset('assets/logo_small.png', width: 28, height: 28),
+              ),
+              const SizedBox(width: 8),
               RichText(
                 text: const TextSpan(
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: CLColors.text),
