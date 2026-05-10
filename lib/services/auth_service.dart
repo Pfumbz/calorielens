@@ -185,6 +185,12 @@ class AuthService {
     if (lower.contains('signups not allowed') || lower.contains('signup is disabled')) {
       return 'Sign-ups are temporarily unavailable. Please try again later.';
     }
+    if (lower.contains('sending confirmation email') || lower.contains('error sending')) {
+      return 'We couldn\'t send the confirmation email right now. Please try again in a few minutes, or sign in with Google instead.';
+    }
+    if (lower.contains('unexpected_failure') || lower.contains('unexpected failure')) {
+      return 'Something went wrong on our end. Please try again or use Google sign-in.';
+    }
     return raw;
   }
 }
