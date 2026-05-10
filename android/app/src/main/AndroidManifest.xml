@@ -33,6 +33,15 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Deep link for Supabase email confirmation / password reset -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="com.pcmacstudios.calorielens"
+                    android:host="login-callback" />
+            </intent-filter>
         </activity>
         <!-- AdMob App ID — using test ID until app is on Play Store -->
         <!-- Production: ca-app-pub-5237846834490979~1166433546 -->

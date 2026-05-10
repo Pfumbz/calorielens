@@ -20,6 +20,10 @@ class SupabaseService {
   /// The underlying Supabase client (use sparingly outside this service).
   static SupabaseClient get client => Supabase.instance.client;
 
+  /// Deep link scheme used for email confirmation and password reset callbacks.
+  static const String deepLinkScheme = 'com.pcmacstudios.calorielens';
+  static const String redirectUrl = '$deepLinkScheme://login-callback';
+
   /// Initialise once in main() before runApp().
   static Future<void> initialize() async {
     await Supabase.initialize(

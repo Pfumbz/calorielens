@@ -34,7 +34,11 @@ class AuthService {
     String password,
   ) async {
     try {
-      final res = await _client.auth.signUp(email: email, password: password);
+      final res = await _client.auth.signUp(
+        email: email,
+        password: password,
+        emailRedirectTo: SupabaseService.redirectUrl,
+      );
       // Supabase returns res.user even when email confirmation is enabled,
       // but res.session is null until the user confirms their email.
       // So we check session to know if the user is actually signed in.
@@ -145,7 +149,10 @@ class AuthService {
   // ── Password reset ──────────────────────────────────────────────────────
   static Future<AuthResult> sendPasswordReset(String email) async {
     try {
-      await _client.auth.resetPasswordForEmail(email);
+      await _client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: SupabaseService.redirectUrl,
+      );
       return AuthResult(
         success: true,
         error: 'Password reset email sent. Check your inbox.',

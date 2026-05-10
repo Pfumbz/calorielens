@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen>
         if (result.user == null) {
           // Email confirmation is enabled — user must verify before signing in.
           setState(() {
-            _infoMsg = 'Account created! Check your email for a verification link, then sign in below.';
+            _infoMsg = 'Account created! Check your email and tap the verification link — it will open the app and sign you in automatically.';
             _isSignUp = false; // Switch to sign-in mode
             _pwCtrl.clear();
             _errorType = null;
