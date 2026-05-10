@@ -195,6 +195,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _signInHandled = false;
+  bool _recoveryDialogShown = false;
 
   Future<void> _handleGuestMode() async {
     try {
@@ -215,6 +216,15 @@ class _AuthGateState extends State<AuthGate> {
           return const AppShell();
         }
 
+        // Check for password recovery event
+        final data = snapshot.data;
+        if (data != null && data.event == AuthChangeEvent.passwordRecovery && !_recoveryDialogShown) {
+          _recoveryDialogShown = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showPasswordResetDialog(context);
+          });
+        }
+
         final isSignedIn = SupabaseService.isSignedIn;
 
         if (isSignedIn) {
@@ -230,10 +240,129 @@ class _AuthGateState extends State<AuthGate> {
 
         // User signed out — reset guard so next sign-in triggers sync
         _signInHandled = false;
+        _recoveryDialogShown = false;
 
         // Show login screen — guest callback triggers anonymous sign-in
         return LoginScreen(
           onContinueAsGuest: _handleGuestMode,
+        );
+      },
+    );
+  }
+
+  void _showPasswordResetDialog(BuildContext context) {
+    final pwCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool loading = false;
+    String? error;
+    bool obscure = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: CLColors.surface2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                'Set your new password',
+                style: TextStyle(color: CLColors.text, fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Choose a new password for your account.',
+                    style: TextStyle(color: CLColors.muted, fontSize: 13),
+                  ),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: pwCtrl,
+                    obscureText: obscure,
+                    style: const TextStyle(color: CLColors.text),
+                    decoration: InputDecoration(
+                      hintText: 'New password (min. 6 chars)',
+                      prefixIcon: const Icon(Icons.lock_outline, size: 18, color: CLColors.muted),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscure ? Icons.visibility_off : Icons.visibility,
+                          size: 18, color: CLColors.muted,
+                        ),
+                        onPressed: () => setDialogState(() => obscure = !obscure),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmCtrl,
+                    obscureText: obscure,
+                    style: const TextStyle(color: CLColors.text),
+                    decoration: const InputDecoration(
+                      hintText: 'Confirm new password',
+                      prefixIcon: Icon(Icons.lock_outline, size: 18, color: CLColors.muted),
+                    ),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(error!, style: const TextStyle(color: CLColors.red, fontSize: 12)),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: loading ? null : () {
+                    Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Cancel', style: TextStyle(color: CLColors.muted)),
+                ),
+                ElevatedButton(
+                  onPressed: loading ? null : () async {
+                    final pw = pwCtrl.text;
+                    final confirm = confirmCtrl.text;
+
+                    if (pw.length < 6) {
+                      setDialogState(() => error = 'Password must be at least 6 characters.');
+                      return;
+                    }
+                    if (pw != confirm) {
+                      setDialogState(() => error = 'Passwords do not match.');
+                      return;
+                    }
+
+                    setDialogState(() { loading = true; error = null; });
+
+                    try {
+                      await SupabaseService.client.auth.updateUser(
+                        UserAttributes(password: pw),
+                      );
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Password updated successfully!'),
+                            backgroundColor: CLColors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      setDialogState(() {
+                        loading = false;
+                        error = 'Failed to update password. Please try again.';
+                      });
+                    }
+                  },
+                  child: loading
+                      ? const SizedBox(
+                          height: 16, width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Update Password'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

@@ -106,8 +106,12 @@ class _LoginScreenState extends State<LoginScreen>
       if (result.success) {
         if (result.user == null) {
           // Email confirmation is enabled — user must verify before signing in.
+          // Note: Supabase returns the same response for new AND existing users
+          // (security feature to prevent email enumeration), so we phrase the
+          // message to work in both cases.
           setState(() {
-            _infoMsg = 'Account created! Check your email and tap the verification link — it will open the app and sign you in automatically.';
+            _infoMsg = 'Check your email for a verification link to sign in. '
+                'If you already have an account, try signing in below or use "Forgot password?" to reset it.';
             _isSignUp = false; // Switch to sign-in mode
             _pwCtrl.clear();
             _errorType = null;
@@ -476,14 +480,32 @@ class _LoginScreenState extends State<LoginScreen>
         return [
           _errorActionChip('Resend confirmation', () async {
             final email = _emailCtrl.text.trim();
+            final pw = _pwCtrl.text;
             if (email.isEmpty) return;
             setState(() { _loading = true; _errorMsg = null; _errorType = null; });
-            // Use password reset as a proxy to trigger email
+            // Re-trigger signup to resend the confirmation email
+            if (pw.length >= 6) {
+              await AuthService.signUpWithEmail(email, pw);
+            } else {
+              // Fallback: use password reset to send an email
+              await AuthService.sendPasswordReset(email);
+            }
+            if (mounted) {
+              setState(() {
+                _loading = false;
+                _infoMsg = 'Confirmation email resent. Check your inbox (and spam folder).';
+              });
+            }
+          }),
+          _errorActionChip('Reset password', () async {
+            final email = _emailCtrl.text.trim();
+            if (email.isEmpty) return;
+            setState(() { _loading = true; _errorMsg = null; _errorType = null; });
             await AuthService.sendPasswordReset(email);
             if (mounted) {
               setState(() {
                 _loading = false;
-                _infoMsg = 'Confirmation email resent. Check your inbox.';
+                _infoMsg = 'Password reset email sent. Check your inbox.';
               });
             }
           }),
