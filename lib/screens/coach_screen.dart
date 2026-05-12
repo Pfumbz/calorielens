@@ -612,16 +612,14 @@ class _CoachScreenState extends State<CoachScreen> {
   // ── FREE DASHBOARD ────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildFreeDashboard(AppState state) {
-    final insight = _getFreeInsight(state);
-
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 14),
-          // ── Today's Insight ──
-          _buildFreeInsightCard(insight),
+          // ── Today's Insight teaser (Pro-gated) ──
+          _buildInsightTeaser(),
           const SizedBox(height: 20),
           // ── Quick Prompts (vertical) ──
           const Text('Quick prompts',
@@ -646,66 +644,70 @@ class _CoachScreenState extends State<CoachScreen> {
     );
   }
 
-  String _getFreeInsight(AppState state) {
-    final prot = state.totalProtein;
-    final targets = _getTargets(state);
-    final protPct =
-        targets.protein > 0 ? (prot / targets.protein * 100).round() : 0;
-    final hour = DateTime.now().hour;
-
-    if (hour >= 12 && protPct < 40) {
-      return 'You\'re low on protein today.\nTry adding a high-protein meal.';
-    }
-    if (state.totalCalories > state.calorieGoal) {
-      return 'You\'re over your calorie goal.\nFocus on lighter choices.';
-    }
-    if (state.diary.isEmpty) {
-      return 'No meals logged yet.\nStart tracking to get insights.';
-    }
-    final left = state.calorieGoal - state.totalCalories;
-    return 'You have $left kcal remaining.\n${state.diary.length} meal${state.diary.length > 1 ? 's' : ''} logged so far.';
-  }
-
-  Widget _buildFreeInsightCard(String text) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: CLColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: CLColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: CLColors.accentLo,
-              borderRadius: BorderRadius.circular(12),
+  /// Pro-gated Today's Insight teaser — tapping opens upgrade modal.
+  Widget _buildInsightTeaser() {
+    return GestureDetector(
+      onTap: () => showUpgradeModal(context, source: 'budget_coach'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: CLColors.goldLo,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CLColors.gold.withOpacity(0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: CLColors.gold.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.lock_outline,
+                  color: CLColors.gold, size: 20),
             ),
-            child: const Icon(Icons.insights_outlined,
-                color: CLColors.accent, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Today\'s insight',
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('Today\'s Insight',
+                          style: TextStyle(
+                              color: CLColors.gold,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: CLColors.gold.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('PRO',
+                            style: TextStyle(
+                                color: CLColors.gold,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Unlock AI-powered daily insights based on your meals and goals.',
                     style: TextStyle(
-                        color: CLColors.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(text,
-                    style: const TextStyle(
-                        color: CLColors.muted, fontSize: 12, height: 1.4)),
-              ],
+                        color: CLColors.muted, fontSize: 12, height: 1.4),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: CLColors.muted2, size: 20),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -839,8 +841,47 @@ class _CoachScreenState extends State<CoachScreen> {
   // ═══════════════════════════════════════════════════════════════════════
   // ── PRO DASHBOARD ─────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Pro Insight state ──
+  bool _insightLoading = false;
+  String? _proInsight;
+
+  Future<void> _generateInsight() async {
+    if (_insightLoading) return;
+    final state = context.read<AppState>();
+
+    setState(() => _insightLoading = true);
+
+    try {
+      final prompt =
+          'Based on my today\'s meals and this week\'s eating patterns, give me ONE key insight for today. '
+          'Keep it to 2-3 sentences max. Be specific — reference actual meals or patterns you see. '
+          'Focus on something actionable I can do for the rest of the day. '
+          'No headers, no bullets — just a concise, warm, personalised tip.';
+
+      final reply = await state.backend.chat(
+        history: [],
+        userMessage: prompt,
+        systemPrompt: _buildSystemPrompt(state),
+      );
+
+      if (mounted) {
+        setState(() {
+          _proInsight = reply.trim();
+          _insightLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _proInsight = 'Couldn\'t load insight right now. Tap to retry.';
+          _insightLoading = false;
+        });
+      }
+    }
+  }
+
   Widget _buildProDashboard(AppState state) {
-    final targets = _getTargets(state);
     final fixes = _computeSmartFix(state);
 
     return SingleChildScrollView(
@@ -849,8 +890,8 @@ class _CoachScreenState extends State<CoachScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 10),
-          // 1. Daily Summary — calorie ring + macro bars
-          _buildDailySummary(state, targets),
+          // 1. Today's AI Insight (replaces calorie ring)
+          _buildProInsightCard(state),
           const SizedBox(height: 16),
           // 2. What should you eat next? (centerpiece)
           _buildWhatToEatCard(state),
@@ -866,94 +907,131 @@ class _CoachScreenState extends State<CoachScreen> {
     );
   }
 
-  // ── 1. Daily Summary ──────────────────────────────────────────────────
-  Widget _buildDailySummary(AppState state, _MacroTargets targets) {
-    final goal = state.calorieGoal;
-    final used = state.totalCalories;
-    final remaining = (goal - used).clamp(0, 9999);
-    final progress = goal > 0 ? (used / goal).clamp(0.0, 1.0) : 0.0;
+  // ── 1. Today's AI Insight (Pro) ───────────────────────────────────────
+  Widget _buildProInsightCard(AppState state) {
+    final remaining = (state.calorieGoal - state.totalCalories).clamp(0, 9999);
+    final mealsLogged = state.diary.length;
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: CLColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: CLColors.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Calorie ring
-          SizedBox(
-            width: 80,
-            height: 80,
-            child: CustomPaint(
-              painter: _CalorieRingPainter(progress: progress),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('$remaining',
-                        style: const TextStyle(
-                            color: CLColors.text,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700)),
-                    const Text('kcal left',
-                        style:
-                            TextStyle(color: CLColors.muted, fontSize: 9)),
+          // Header row
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: CLColors.accentLo,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.insights_outlined,
+                    color: CLColors.accent, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Today\'s Insight',
+                    style: TextStyle(
+                        color: CLColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600)),
+              ),
+              // Quick stats pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: CLColors.surface2,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$remaining kcal left · $mealsLogged meal${mealsLogged != 1 ? 's' : ''}',
+                  style: const TextStyle(
+                      color: CLColors.muted, fontSize: 10, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // AI Insight content
+          if (_proInsight == null && !_insightLoading)
+            GestureDetector(
+              onTap: _generateInsight,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: CLColors.accentLo.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: CLColors.accent.withOpacity(0.15)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.auto_awesome, size: 14, color: CLColors.accent),
+                    SizedBox(width: 8),
+                    Text('Tap to get your personalised insight',
+                        style: TextStyle(
+                            color: CLColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 18),
-          // Macro progress bars
-          Expanded(
-            child: Column(
-              children: [
-                _macroBar('Protein', state.totalProtein, targets.protein,
-                    CLColors.green),
-                const SizedBox(height: 10),
-                _macroBar(
-                    'Carbs', state.totalCarbs, targets.carbs, CLColors.blue),
-                const SizedBox(height: 10),
-                _macroBar(
-                    'Fat', state.totalFat, targets.fat, CLColors.accent),
-              ],
+          if (_insightLoading)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+              decoration: BoxDecoration(
+                color: CLColors.surface2,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: const [
+                  SizedBox(
+                    width: 14, height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: CLColors.accent),
+                  ),
+                  SizedBox(width: 10),
+                  Text('Analysing your meals…',
+                      style: TextStyle(color: CLColors.muted, fontSize: 12)),
+                ],
+              ),
             ),
-          ),
+          if (_proInsight != null && !_insightLoading)
+            GestureDetector(
+              onTap: _generateInsight,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: CLColors.surface2,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_proInsight!,
+                        style: const TextStyle(
+                            color: CLColors.text, fontSize: 13, height: 1.5)),
+                    const SizedBox(height: 8),
+                    const Text('Tap to refresh',
+                        style: TextStyle(color: CLColors.muted2, fontSize: 10)),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-    );
-  }
-
-  Widget _macroBar(String label, int current, int target, Color color) {
-    final pct = target > 0 ? (current / target).clamp(0.0, 1.0) : 0.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    color: color, fontSize: 11, fontWeight: FontWeight.w600)),
-            Text('$current / ${target}g',
-                style: const TextStyle(color: CLColors.text, fontSize: 11)),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: SizedBox(
-            height: 5,
-            child: LinearProgressIndicator(
-              value: pct,
-              backgroundColor: color.withOpacity(0.15),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -2322,46 +2400,6 @@ class _MealDetailSheetState extends State<_MealDetailSheet> {
 // ═══════════════════════════════════════════════════════════════════════════
 // ── PAINTERS & DATA CLASSES ─────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
-
-class _CalorieRingPainter extends CustomPainter {
-  final double progress;
-  _CalorieRingPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 5;
-    const stroke = 7.0;
-
-    canvas.drawCircle(
-        center,
-        radius,
-        Paint()
-          ..color = CLColors.surface2
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = stroke);
-
-    final color = progress >= 1.0
-        ? CLColors.gold
-        : progress >= 0.7
-            ? CLColors.green
-            : CLColors.accent;
-
-    canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        -pi / 2,
-        2 * pi * progress,
-        false,
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = stroke
-          ..strokeCap = StrokeCap.round);
-  }
-
-  @override
-  bool shouldRepaint(_CalorieRingPainter old) => old.progress != progress;
-}
 
 class _MacroTargets {
   final int protein, carbs, fat;
