@@ -948,10 +948,12 @@ class _ScanScreenState extends State<ScanScreen>
     _resultAnim.reset();
     try {
       final state = Provider.of<AppState>(context, listen: false);
-      final result = await state.backend.scanText(description);
+      // Pass isCorrection: true so neither the Edge Function nor local
+      // counter charge a scan — the user already spent one on the original.
+      final result = await state.backend.scanText(description, isCorrection: true);
       setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
-      await state.trackScan();
+      // No trackScan() here — corrections are free
     } catch (e) {
       setState(() => _loading = false);
       if (!mounted) return;

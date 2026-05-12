@@ -7,9 +7,12 @@ import 'services/supabase_service.dart';
 import 'services/backend_service.dart';
 import 'services/purchase_service.dart';
 
-class AppState extends ChangeNotifier {
+class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final _storage = StorageService();
   final _purchases = PurchaseService();
+
+  /// Tracks the date when data was last loaded so we can detect day rollover.
+  String _lastLoadedDate = '';
 
   // ── Local state (always populated — offline-first) ──────────────────────
   List<DiaryEntry> _diary = [];
@@ -115,6 +118,8 @@ class AppState extends ChangeNotifier {
 
   // ── Initialisation ───────────────────────────────────────────────────────
   Future<void> init() async {
+    WidgetsBinding.instance.addObserver(this);
+
     // Always load local data first (works offline)
     _diary       = _storage.getDiary();
     _profile     = _storage.profile;
@@ -122,6 +127,7 @@ class AppState extends ChangeNotifier {
     _isPremium   = _storage.isPremium;
     _apiKey      = _storage.apiKey;
     _savedPlanIds = _storage.savedPlanIds;
+    _lastLoadedDate = _todayString();
 
     // Sync current Supabase user
     _supabaseUser = SupabaseService.currentUser;
@@ -149,6 +155,49 @@ class AppState extends ChangeNotifier {
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
     ));
+
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // ── App lifecycle — refresh on resume ─────────────────────────────────
+  static String _todayString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _onAppResumed();
+    }
+  }
+
+  /// Called when the app returns to the foreground.
+  /// Reloads today's diary and resets scan counters if the date has rolled over.
+  Future<void> _onAppResumed() async {
+    final today = _todayString();
+    final dateChanged = today != _lastLoadedDate;
+
+    // Always reload today's diary (user may have been away for a while)
+    _diary = _storage.getDiary();
+
+    if (dateChanged) {
+      // Date rolled over — reset local scan/chat counters
+      _backendScansToday = 0;
+      _backendChatsToday = 0;
+      _lastLoadedDate = today;
+    }
+
+    // Refresh from cloud if signed in (gets accurate scan count for today)
+    if (isSignedIn) {
+      unawaited(_refreshFromCloud());
+    }
 
     notifyListeners();
   }

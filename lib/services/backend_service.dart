@@ -54,16 +54,21 @@ class BackendService {
   }
 
   // ── Scan text ────────────────────────────────────────────────────────────
-  Future<ScanResult> scanText(String description) async {
+  /// [isCorrection] skips the server-side scan counter so corrections
+  /// don't consume the user's daily quota.
+  Future<ScanResult> scanText(String description, {bool isCorrection = false}) async {
     if (_useByok) {
       return AnthropicService(byokApiKey!).scanText(description);
     }
     _requireSignIn();
 
+    final body = <String, dynamic>{'description': description};
+    if (isCorrection) body['is_correction'] = true;
+
     final res = await http.post(
       Uri.parse('$_functionsBaseUrl/scan-text'),
       headers: _authHeaders,
-      body: jsonEncode({'description': description}),
+      body: jsonEncode(body),
     ).timeout(const Duration(seconds: 30));
 
     return _parseScanResponse(res);

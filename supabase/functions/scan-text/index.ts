@@ -41,27 +41,31 @@ serve(async (req) => {
     const today = new Date().toISOString().split('T')[0]
     const scanLimit = isPremium ? PRO_SCAN_LIMIT : isAnonymous ? GUEST_SCAN_LIMIT : FREE_SCAN_LIMIT
 
-    // Atomically check + increment scan count (prevents race conditions)
-    const { data: newCount, error: rpcError } = await supabase.rpc(
-      'increment_scan_if_allowed',
-      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
-    )
+    const body = await req.json()
+    const { description, is_correction } = body
 
-    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
-
-    if (newCount === -1) {
-      const message = isPremium
-        ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
-        : isAnonymous
-          ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
-          : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
-      return new Response(
-        JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // Corrections (re-analysis after "Correct" button) are free — skip the counter
+    if (!is_correction) {
+      // Atomically check + increment scan count (prevents race conditions)
+      const { data: newCount, error: rpcError } = await supabase.rpc(
+        'increment_scan_if_allowed',
+        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
       )
-    }
 
-    const { description } = await req.json()
+      if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+
+      if (newCount === -1) {
+        const message = isPremium
+          ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
+          : isAnonymous
+            ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
+            : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
+        return new Response(
+          JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
     if (!description) {
       return new Response(JSON.stringify({ error: 'Missing description' }), {
         status: 400,
