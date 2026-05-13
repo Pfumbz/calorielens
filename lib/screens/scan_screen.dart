@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/openfoodfacts_service.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
+import '../utils/error_helpers.dart';
 import '../widgets/upgrade_modal.dart';
 
 
@@ -165,7 +166,7 @@ class _ScanScreenState extends State<ScanScreen>
       _resultAnim.forward(from: 0);
     } catch (e) {
       setState(
-          () => _error = e.toString().replaceFirst('Exception: ', ''));
+          () => _error = friendlyError(e));
     } finally {
       setState(() => _loading = false);
     }
@@ -700,7 +701,7 @@ class _ScanScreenState extends State<ScanScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = 'Lookup failed: ${e.toString().replaceFirst("Exception: ", "")}'; });
+      setState(() { _loading = false; _error = friendlyError(e); });
     }
   }
 
@@ -715,7 +716,7 @@ class _ScanScreenState extends State<ScanScreen>
       await state.trackScan();
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = e.toString().replaceFirst('Exception: ', ''); });
+      setState(() { _loading = false; _error = friendlyError(e); });
     }
   }
 
@@ -958,7 +959,7 @@ class _ScanScreenState extends State<ScanScreen>
       setState(() => _loading = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red.shade700),
+        SnackBar(content: Text(friendlyError(e)), backgroundColor: Colors.red.shade700),
       );
     }
   }

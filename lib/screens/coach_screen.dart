@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
 import '../utils/pricing.dart';
+import '../utils/error_helpers.dart';
 import '../widgets/upgrade_modal.dart';
 
 class CoachScreen extends StatefulWidget {
@@ -425,7 +426,7 @@ class _CoachScreenState extends State<CoachScreen> {
       setState(() {
         _messages.add(ChatMessage(
           role: 'assistant',
-          content: '⚠ Error: ${e.toString().replaceFirst('Exception: ', '')}',
+          content: '⚠ ${friendlyError(e)}',
           timestamp: DateTime.now(),
         ));
       });
@@ -618,9 +619,6 @@ class _CoachScreenState extends State<CoachScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 14),
-          // ── Today's Insight teaser (Pro-gated) ──
-          _buildInsightTeaser(),
-          const SizedBox(height: 20),
           // ── Quick Prompts (vertical) ──
           const Text('Quick prompts',
               style: TextStyle(
@@ -640,74 +638,6 @@ class _CoachScreenState extends State<CoachScreen> {
           _buildSmartSuggestionsTeaser(),
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
-
-  /// Pro-gated Today's Insight teaser — tapping opens upgrade modal.
-  Widget _buildInsightTeaser() {
-    return GestureDetector(
-      onTap: () => showUpgradeModal(context, source: 'budget_coach'),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: CLColors.goldLo,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: CLColors.gold.withOpacity(0.25)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: CLColors.gold.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.lock_outline,
-                  color: CLColors.gold, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text('Today\'s Insight',
-                          style: TextStyle(
-                              color: CLColors.gold,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: CLColors.gold.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text('PRO',
-                            style: TextStyle(
-                                color: CLColors.gold,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Unlock AI-powered daily insights based on your meals and goals.',
-                    style: TextStyle(
-                        color: CLColors.muted, fontSize: 12, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

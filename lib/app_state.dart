@@ -129,10 +129,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _savedPlanIds = _storage.savedPlanIds;
     _lastLoadedDate = _todayString();
 
+    // Load cached cloud counters (so offline mode shows correct values)
+    _backendScansToday = _storage.cachedCloudScans;
+    _backendChatsToday = _storage.cachedCloudChats;
+
     // Sync current Supabase user
     _supabaseUser = SupabaseService.currentUser;
 
     if (_supabaseUser != null) {
+      // Refresh from cloud if online — updates counters from server
       await _refreshFromCloud();
     }
 
@@ -227,10 +232,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // ── Refresh data from cloud ─────────────────────────────────────────────
   Future<void> _refreshFromCloud() async {
     try {
-      // Fetch usage stats (for rate limit display)
+      // Fetch usage stats (for rate limit display) and cache locally
       final usage = await SupabaseService.fetchTodayUsage();
       _backendScansToday = usage.scans;
       _backendChatsToday = usage.chats;
+      unawaited(_storage.setCachedCloudScans(usage.scans));
+      unawaited(_storage.setCachedCloudChats(usage.chats));
 
       // Fetch profile from cloud (overrides local if cloud is newer)
       final cloudProfile = await SupabaseService.fetchProfile();
@@ -397,6 +404,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     if (isSignedIn) {
       // Cloud counter is incremented by the Edge Function — just update local cache
       _backendScansToday = (_backendScansToday + 1).clamp(0, 999);
+      unawaited(_storage.setCachedCloudScans(_backendScansToday));
     } else {
       await _storage.incrementScanCount();
     }
@@ -407,6 +415,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   void trackChat() {
     if (isSignedIn) {
       _backendChatsToday = (_backendChatsToday + 1).clamp(0, 999);
+      unawaited(_storage.setCachedCloudChats(_backendChatsToday));
     }
     notifyListeners();
   }

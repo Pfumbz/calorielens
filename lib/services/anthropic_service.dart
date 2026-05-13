@@ -118,7 +118,7 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
         ? 'under R50 (budget, use Shoprite/Checkers ingredients)'
         : budgetTier == 'r100'
             ? 'around R100 (mid-range, use Pick n Pay/Checkers ingredients)'
-            : 'up to R150 (premium, can use Woolworths ingredients)';
+            : 'up to R150 (premium, use quality store-bought ingredients)';
 
     final dietNote = dietaryPreference != null && dietaryPreference.isNotEmpty
         ? '\nDietary preference: $dietaryPreference.'

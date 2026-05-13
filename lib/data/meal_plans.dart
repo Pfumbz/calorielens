@@ -201,76 +201,7 @@ const List<MealPlan> kMealPlans = [
   ),
 
   // ═══════════════════════════════════════════════════════════════════
-  // 4. WOOLWORTHS BALANCED
-  // ═══════════════════════════════════════════════════════════════════
-  MealPlan(
-    id: 'mp4',
-    name: 'Woolies Balanced Day',
-    description: 'Premium balanced meals using Woolworths prepared ingredients. Convenient, nutritious, and delicious.',
-    category: 'balanced',
-    budgetTier: 'r150',
-    estimatedCostZAR: 145,
-    totalCalories: 1900,
-    totalProtein: 110,
-    totalCarbs: 185,
-    totalFat: 75,
-    servings: 1,
-    prepTimeMin: 20,
-    emoji: '✨',
-    tags: ['premium', 'woolworths', 'balanced', 'convenient'],
-    meals: [
-      PlanMeal(
-        id: 'mp4_b', name: 'Greek Yoghurt & Granola Bowl', mealType: 'breakfast',
-        calories: 420, protein: 22, carbs: 48, fat: 16,
-        emoji: '🥣',
-        recipe: 'Layer Greek yoghurt with granola and fresh berries. Drizzle with honey.',
-        ingredients: [
-          Ingredient(name: 'Greek yoghurt', quantity: '500g', estimatedPriceZAR: 45, category: 'dairy'),
-          Ingredient(name: 'granola', quantity: '350g', estimatedPriceZAR: 50, category: 'grain'),
-          Ingredient(name: 'mixed berries', quantity: '200g', estimatedPriceZAR: 40, category: 'produce'),
-          Ingredient(name: 'honey', quantity: '375g', estimatedPriceZAR: 55, category: 'pantry'),
-        ],
-      ),
-      PlanMeal(
-        id: 'mp4_l', name: 'Roast Chicken & Quinoa Salad', mealType: 'lunch',
-        calories: 550, protein: 42, carbs: 48, fat: 22,
-        emoji: '🥗',
-        recipe: 'Shred rotisserie chicken over cooked quinoa. Add roasted butternut, feta, and rocket. Dress with olive oil and lemon.',
-        ingredients: [
-          Ingredient(name: 'rotisserie chicken', quantity: '1 whole', estimatedPriceZAR: 75, category: 'protein'),
-          Ingredient(name: 'quinoa', quantity: '300g', estimatedPriceZAR: 40, category: 'grain'),
-          Ingredient(name: 'butternut', quantity: '1 medium', estimatedPriceZAR: 18, category: 'produce'),
-          Ingredient(name: 'feta cheese', quantity: '200g', estimatedPriceZAR: 35, category: 'dairy'),
-          Ingredient(name: 'rocket', quantity: '100g bag', estimatedPriceZAR: 20, category: 'produce'),
-        ],
-      ),
-      PlanMeal(
-        id: 'mp4_d', name: 'Salmon & Veg Stir-fry', mealType: 'dinner',
-        calories: 620, protein: 38, carbs: 55, fat: 28,
-        emoji: '🐟',
-        recipe: 'Pan-sear salmon fillet. Stir-fry mixed vegetables with soy sauce and garlic. Serve with brown rice.',
-        ingredients: [
-          Ingredient(name: 'salmon fillet', quantity: '200g', estimatedPriceZAR: 85, category: 'protein'),
-          Ingredient(name: 'stir-fry vegetables', quantity: '300g', estimatedPriceZAR: 30, category: 'produce'),
-          Ingredient(name: 'brown rice', quantity: '1kg', estimatedPriceZAR: 25, category: 'grain'),
-          Ingredient(name: 'soy sauce', quantity: '250ml', estimatedPriceZAR: 20, category: 'pantry'),
-        ],
-      ),
-      PlanMeal(
-        id: 'mp4_s', name: 'Dark Chocolate & Almonds', mealType: 'snack',
-        calories: 310, protein: 8, carbs: 34, fat: 9,
-        emoji: '🍫',
-        recipe: 'Enjoy 3 squares of dark chocolate with a handful of almonds.',
-        ingredients: [
-          Ingredient(name: 'dark chocolate (70%)', quantity: '100g', estimatedPriceZAR: 35, category: 'pantry'),
-          Ingredient(name: 'almonds', quantity: '200g', estimatedPriceZAR: 45, category: 'pantry'),
-        ],
-      ),
-    ],
-  ),
-
-  // ═══════════════════════════════════════════════════════════════════
-  // 5. MEAL PREP SUNDAY
+  // 4. MEAL PREP SUNDAY
   // ═══════════════════════════════════════════════════════════════════
   MealPlan(
     id: 'mp5',
@@ -523,7 +454,7 @@ const List<MealPlan> kMealPlans = [
         id: 'mp8_s', name: 'Melktert', mealType: 'snack',
         calories: 350, protein: 20, carbs: 40, fat: 7,
         emoji: '🥧',
-        recipe: 'Enjoy a slice of melktert with cinnamon. Best bought from a bakery or Woolworths.',
+        recipe: 'Enjoy a slice of melktert with cinnamon. Best bought from a local bakery.',
         ingredients: [
           Ingredient(name: 'melktert', quantity: '1 whole', estimatedPriceZAR: 45, category: 'pantry'),
         ],

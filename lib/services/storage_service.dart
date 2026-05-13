@@ -38,6 +38,16 @@ class StorageService {
 
   bool get canScan => isPremium || scanCountToday < 3;
 
+  // ── Cloud scan/chat count cache (survives restarts for offline) ───
+  String get _cloudScanKey => 'cl6_cloud_scans_${_dateKey(DateTime.now())}';
+  String get _cloudChatKey => 'cl6_cloud_chats_${_dateKey(DateTime.now())}';
+
+  int get cachedCloudScans => _prefs.getInt(_cloudScanKey) ?? 0;
+  int get cachedCloudChats => _prefs.getInt(_cloudChatKey) ?? 0;
+
+  Future<void> setCachedCloudScans(int v) => _prefs.setInt(_cloudScanKey, v);
+  Future<void> setCachedCloudChats(int v) => _prefs.setInt(_cloudChatKey, v);
+
   // ── Diary ─────────────────────────────────────────────────────────
   List<DiaryEntry> getDiary({DateTime? date}) {
     final k = 'cl3_diary_${_dateKey(date ?? DateTime.now())}';
