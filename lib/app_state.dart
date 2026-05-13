@@ -59,7 +59,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   int get scansRemainingToday {
     if (_apiKey.isNotEmpty) return 999; // BYOK = unlimited
     if (_isPremium) return (proScanLimit - _backendScansToday).clamp(0, proScanLimit);
-    if (isAnonymous) return (guestScanLimit - _backendScansToday).clamp(0, guestScanLimit);
+    // Guest limit uses device-level counter so it survives sign-in/sign-out cycling.
+    if (isAnonymous) return (guestScanLimit - _storage.scanCountToday).clamp(0, guestScanLimit);
     if (isSignedIn) return (freeScanLimit - _backendScansToday).clamp(0, freeScanLimit);
     return 0; // not signed in at all
   }
@@ -69,7 +70,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool get canScan {
     if (_apiKey.isNotEmpty) return true; // BYOK = unlimited
     if (_isPremium) return _backendScansToday < proScanLimit;
-    if (isAnonymous) return _backendScansToday < guestScanLimit;
+    // Guest limit uses device-level counter — cannot be reset by sign-out.
+    if (isAnonymous) return _storage.scanCountToday < guestScanLimit;
     if (isSignedIn) return _backendScansToday < freeScanLimit;
     return false; // not signed in at all
   }
