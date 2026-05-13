@@ -401,12 +401,14 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // ── Scan tracking ────────────────────────────────────────────────────────
   /// Called after a successful scan to update local/cloud counters.
   Future<void> trackScan() async {
+    // Always increment device-level counter so guest limit survives
+    // sign-in / sign-out cycling on the same day.
+    await _storage.incrementScanCount();
+
     if (isSignedIn) {
       // Cloud counter is incremented by the Edge Function — just update local cache
       _backendScansToday = (_backendScansToday + 1).clamp(0, 999);
       unawaited(_storage.setCachedCloudScans(_backendScansToday));
-    } else {
-      await _storage.incrementScanCount();
     }
     notifyListeners();
   }
@@ -465,7 +467,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // ── Sign out ─────────────────────────────────────────────────────────────
   Future<void> signOut() async {
     _supabaseUser = null;
-    _backendScansToday = 0;
+
+    // Restore device-level scan count so guest limit reflects ALL scans
+    // made today (prevents exploit: guest→sign-in→sign-out→fresh counter).
+    _backendScansToday = _storage.scanCountToday;
     _backendChatsToday = 0;
 
     // Prune diary down to guest limits
