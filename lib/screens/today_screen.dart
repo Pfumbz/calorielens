@@ -347,7 +347,10 @@ class TodayScreen extends StatelessWidget {
                   final barH = barMax > 0 ? (v / barMax * 50).clamp(0.0, 50.0) : 0.0;
                   final isToday = i == 6;
                   final overGoal = v > state.calorieGoal && v > 0;
-                  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                  // Dynamic labels: each bar is (today - 6 + i) days
+                  const dayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                  final dayDate = DateTime.now().subtract(Duration(days: 6 - i));
+                  final labels = dayLetters[dayDate.weekday - 1];
                   return Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -368,7 +371,7 @@ class TodayScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 5),
-                          Text(labels[i],
+                          Text(labels,
                               style: TextStyle(
                                 color: isToday ? CLColors.accent : CLColors.muted,
                                 fontSize: 10, fontWeight: FontWeight.w500,

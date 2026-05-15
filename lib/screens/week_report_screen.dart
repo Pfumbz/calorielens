@@ -834,7 +834,12 @@ Output ONLY the 4 lines, nothing else.''';
   Widget _buildBarChart(List<int> cals, List<({DateTime date, List<DiaryEntry> entries})> week, int goal) {
     final maxVal = cals.reduce((a, b) => a > b ? a : b);
     final maxY = math.max(maxVal * 1.2, goal * 1.2).toDouble().clamp(1500.0, 8000.0);
-    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Dynamic labels: map each bar to its actual weekday
+    final dayLabels = List.generate(7, (i) {
+      final d = DateTime.now().subtract(Duration(days: 6 - i));
+      return dayNames[d.weekday - 1];
+    });
 
     return BarChart(
       BarChartData(
