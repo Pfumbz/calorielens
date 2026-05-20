@@ -45,6 +45,7 @@ class _ScanScreenState extends State<ScanScreen>
   bool _barcodeScanned = false;
   String? _scannedBarcode;
   BarcodeResult? _barcodeResult;
+  bool _showServingPicker = false; // true = barcode found, awaiting serving size choice
 
   // Animation for result panel appearing
   late AnimationController _resultAnim;
@@ -76,6 +77,7 @@ class _ScanScreenState extends State<ScanScreen>
     ScanScreen.hasResult = false;
     _textCtrl.dispose();
     _barcodeNameCtrl.dispose();
+    _customServingCtrl.dispose();
     _resultAnim.dispose();
     super.dispose();
   }
@@ -206,6 +208,7 @@ class _ScanScreenState extends State<ScanScreen>
         _barcodeScanned = false;
         _scannedBarcode = null;
         _barcodeResult = null;
+        _showServingPicker = false;
       });
       _resultAnim.reset();
     }
@@ -225,6 +228,7 @@ class _ScanScreenState extends State<ScanScreen>
       _barcodeScanned = false;
       _scannedBarcode = null;
       _barcodeResult = null;
+      _showServingPicker = false;
       _updateResultFlag();
     });
     _resultAnim.reset();
@@ -239,6 +243,7 @@ class _ScanScreenState extends State<ScanScreen>
         _barcodeScanned = false;
         _scannedBarcode = null;
         _barcodeResult = null;
+        _showServingPicker = false;
       }
     });
   }
@@ -274,10 +279,7 @@ class _ScanScreenState extends State<ScanScreen>
                 if (_error != null && _scanMode != _ScanMode.barcode) _buildError(),
                 // Analyse button
                 _buildAnalyseBtn(),
-                if (!state.isPremium && !state.hasApiKey) ...[
-                  const SizedBox(height: 14),
-                  _buildProUpsell(),
-                ],
+                // Pro upsell removed from scan landing page per design review
               ],
               const SizedBox(height: 20),
             ],
@@ -691,8 +693,8 @@ class _ScanScreenState extends State<ScanScreen>
       final result = await OpenFoodFactsService.lookup(barcode);
       if (!mounted) return;
       if (result != null && result.nutrition != null) {
-        setState(() { _barcodeResult = result; _result = result.nutrition; _loading = false; _updateResultFlag(); });
-        _resultAnim.forward(from: 0);
+        // Show serving size picker before committing result
+        setState(() { _barcodeResult = result; _showServingPicker = true; _loading = false; _updateResultFlag(); });
       } else if (result != null && result.productName.isNotEmpty) {
         setState(() { _barcodeResult = result; _loading = false; _updateResultFlag(); });
         _aiEstimateFromBarcode(result.displayName);
@@ -735,6 +737,7 @@ class _ScanScreenState extends State<ScanScreen>
         ),
       );
     }
+    if (_showServingPicker && _barcodeResult != null) return _buildServingSizePicker();
     if (_result != null) return const SizedBox.shrink();
 
     return Container(
@@ -770,7 +773,7 @@ class _ScanScreenState extends State<ScanScreen>
           ),
           const SizedBox(height: 8),
           TextButton.icon(
-            onPressed: () { setState(() { _barcodeScanned = false; _scannedBarcode = null; _barcodeResult = null; _error = null; }); },
+            onPressed: () { setState(() { _barcodeScanned = false; _scannedBarcode = null; _barcodeResult = null; _showServingPicker = false; _error = null; }); },
             icon: const Icon(Icons.qr_code_scanner, size: 16),
             label: const Text('Scan Another Barcode'),
             style: TextButton.styleFrom(foregroundColor: CLColors.muted, padding: const EdgeInsets.symmetric(vertical: 8)),
@@ -778,6 +781,183 @@ class _ScanScreenState extends State<ScanScreen>
         ],
       ),
     );
+  }
+
+  /// Serving size picker shown after a successful barcode lookup.
+  Widget _buildServingSizePicker() {
+    final br = _barcodeResult!;
+    final nutrition = br.nutrition!;
+    final servingLabel = br.servingSize ?? 'serving';
+    final packageLabel = br.packageSize != null ? '${br.packageSize}' : null;
+
+    // Calculate how many servings in the package (rough estimate)
+    // We'll offer: 1 serving, ½ serving, whole package (if package size known), custom
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Product header
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: CLColors.green, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(br.displayName,
+                    style: const TextStyle(color: CLColors.text, fontSize: 15, fontWeight: FontWeight.w600),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('Serving size: $servingLabel${packageLabel != null ? '  ·  Package: $packageLabel' : ''}',
+              style: const TextStyle(color: CLColors.muted, fontSize: 12)),
+          Text('${nutrition.totalCalories} Cal per serving',
+              style: const TextStyle(color: CLColors.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+          const Text('How much did you eat?',
+              style: TextStyle(color: CLColors.text, fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          // Quick options
+          _servingOption('1 serving ($servingLabel)', 1.0),
+          const SizedBox(height: 6),
+          _servingOption('½ serving', 0.5),
+          const SizedBox(height: 6),
+          _servingOption('2 servings', 2.0),
+          if (packageLabel != null) ...[
+            const SizedBox(height: 6),
+            _servingOption('Whole package ($packageLabel)', _estimatePackageMultiplier(br)),
+          ],
+          const SizedBox(height: 12),
+          // Custom amount
+          _buildCustomServingRow(),
+          const SizedBox(height: 12),
+          // Scan another
+          Center(
+            child: TextButton.icon(
+              onPressed: () { setState(() { _barcodeScanned = false; _scannedBarcode = null; _barcodeResult = null; _showServingPicker = false; _error = null; }); },
+              icon: const Icon(Icons.qr_code_scanner, size: 16),
+              label: const Text('Scan Another Barcode'),
+              style: TextButton.styleFrom(foregroundColor: CLColors.muted, padding: const EdgeInsets.symmetric(vertical: 8)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _servingOption(String label, double multiplier) {
+    final cals = (_barcodeResult!.nutrition!.totalCalories * multiplier).round();
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: () => _applyServingMultiplier(multiplier, label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: CLColors.text,
+          side: const BorderSide(color: CLColors.border),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+            Text('$cals Cal', style: const TextStyle(color: CLColors.accent, fontSize: 13, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  final _customServingCtrl = TextEditingController();
+
+  Widget _buildCustomServingRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _customServingCtrl,
+            style: const TextStyle(color: CLColors.text, fontSize: 13),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              hintText: 'Custom (e.g. 1.5)',
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: () {
+            final val = double.tryParse(_customServingCtrl.text.trim());
+            if (val != null && val > 0) {
+              _applyServingMultiplier(val, '${_customServingCtrl.text.trim()} servings');
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: CLColors.accent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          ),
+          child: const Text('GO', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        ),
+      ],
+    );
+  }
+
+  double _estimatePackageMultiplier(BarcodeResult br) {
+    // Try to figure out how many servings in the package
+    // If we can parse both values, calculate the ratio
+    if (br.packageSize != null && br.servingSize != null) {
+      final pkgG = _parseGrams(br.packageSize!);
+      final srvG = _parseGrams(br.servingSize!);
+      if (pkgG != null && srvG != null && srvG > 0) {
+        return pkgG / srvG;
+      }
+    }
+    // Fallback: can't determine, assume 3 servings (reasonable default)
+    return 3.0;
+  }
+
+  double? _parseGrams(String s) {
+    // Try to extract a number (possibly with "g", "ml", "kg", "l")
+    final match = RegExp(r'([\d.]+)\s*(kg|g|l|ml)?', caseSensitive: false).firstMatch(s);
+    if (match == null) return null;
+    final num = double.tryParse(match.group(1)!);
+    if (num == null) return null;
+    final unit = (match.group(2) ?? 'g').toLowerCase();
+    if (unit == 'kg' || unit == 'l') return num * 1000;
+    return num; // g or ml
+  }
+
+  void _applyServingMultiplier(double multiplier, String label) {
+    final nutrition = _barcodeResult!.nutrition!;
+    final scaled = ScanResult(
+      mealName: nutrition.mealName,
+      totalCalories: (nutrition.totalCalories * multiplier).round(),
+      proteinG: (nutrition.proteinG * multiplier).round(),
+      carbsG: (nutrition.carbsG * multiplier).round(),
+      fatG: (nutrition.fatG * multiplier).round(),
+      fiberG: (nutrition.fiberG * multiplier).round(),
+      items: nutrition.items.map((item) => FoodItem(
+        name: item.name,
+        portion: label,
+        calories: (item.calories * multiplier).round(),
+        note: item.note,
+      )).toList(),
+      overallNotes: nutrition.overallNotes,
+    );
+    setState(() {
+      _result = scaled;
+      _showServingPicker = false;
+      _updateResultFlag();
+    });
+    _resultAnim.forward(from: 0);
   }
 
   void _submitBarcodeName() {
@@ -857,7 +1037,7 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── RESULT PANEL ────────────────────────────────────────────────────────
   void _showEditSheet(ScanResult r) {
-    final itemCtrls = r.items.map((item) => TextEditingController(text: item.name)).toList();
+    final itemCtrls = r.items.map((item) => TextEditingController(text: '${item.portion} ${item.name}')).toList();
 
     showModalBottomSheet(
       context: context,
@@ -877,7 +1057,7 @@ class _ScanScreenState extends State<ScanScreen>
                     const Text('Correct Food Items',
                         style: TextStyle(color: CLColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
-                    const Text('Fix any item names the AI got wrong, then re-analyse to recalculate nutrition.',
+                    const Text('Fix any item names or quantities the AI got wrong, then re-analyse to recalculate nutrition.',
                         style: TextStyle(color: CLColors.muted, fontSize: 12)),
                     const SizedBox(height: 14),
                     ...List.generate(itemCtrls.length, (i) => Padding(

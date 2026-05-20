@@ -633,6 +633,9 @@ class _CoachScreenState extends State<CoachScreen> {
           const SizedBox(height: 8),
           _buildFreePrompt(
               Icons.pie_chart_outline, 'How can I balance my macros?'),
+          const SizedBox(height: 8),
+          _buildFreePrompt(
+              Icons.trending_up_outlined, 'How am I doing today?'),
           const SizedBox(height: 24),
           // ── Smart Suggestions teaser (locked) ──
           _buildSmartSuggestionsTeaser(),

@@ -9,6 +9,8 @@ class BarcodeResult {
   final String productName;
   final String? brand;
   final String? imageUrl;
+  final String? servingSize;       // e.g. "30g", "1 cup (240ml)"
+  final String? packageSize;       // e.g. "500g", "1L"
   final ScanResult? nutrition; // null if nutrition data unavailable
 
   BarcodeResult({
@@ -16,6 +18,8 @@ class BarcodeResult {
     required this.productName,
     this.brand,
     this.imageUrl,
+    this.servingSize,
+    this.packageSize,
     this.nutrition,
   });
 
@@ -86,11 +90,15 @@ class OpenFoodFactsService {
         );
       }
 
+      final packageQuantity = (product['product_quantity'] as dynamic)?.toString();
+
       return BarcodeResult(
         barcode: barcode,
         productName: name,
         brand: brand,
         imageUrl: imageUrl,
+        servingSize: servingSize,
+        packageSize: packageQuantity,
         nutrition: nutrition,
       );
     } catch (e) {
