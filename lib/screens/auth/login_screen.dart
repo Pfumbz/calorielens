@@ -219,35 +219,35 @@ class _LoginScreenState extends State<LoginScreen>
                 if (_isFromSettings)
                   _buildBackButton()
                 else
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                 _buildLogo(),
-                const SizedBox(height: 36),
+                const SizedBox(height: 24),
                 _buildHeadline(),
-                const SizedBox(height: 28),
-                _buildEmailField(),
-                const SizedBox(height: 14),
-                _buildPasswordField(),
-                const SizedBox(height: 6),
-                if (!_isSignUp) _buildForgotPassword(),
                 const SizedBox(height: 22),
+                _buildEmailField(),
+                const SizedBox(height: 12),
+                _buildPasswordField(),
+                const SizedBox(height: 4),
+                if (!_isSignUp) _buildForgotPassword(),
+                const SizedBox(height: 16),
                 if (_errorMsg != null) ...[
                   _buildErrorCard(_errorMsg!),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                 ],
                 if (_infoMsg != null) ...[
                   _buildMessage(_infoMsg!, isError: false),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                 ],
                 _buildSubmitButton(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _buildDivider(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 _buildGoogleButton(),
-                const SizedBox(height: 28),
+                const SizedBox(height: 18),
                 _buildToggleRow(),
-                const SizedBox(height: 36),
+                const SizedBox(height: 12),
                 _buildGuestOption(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
               ],
             ),
           ),
@@ -619,29 +619,47 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildGuestOption() {
+    if (_isFromSettings) {
+      return Center(
+        child: TextButton(
+          onPressed: _continueAsGuest,
+          child: const Text('← Go back', style: TextStyle(color: CLColors.muted, fontSize: 13)),
+        ),
+      );
+    }
+
     return Center(
-      child: Column(
-        children: [
-          Text(
-            _isFromSettings
-                ? 'You can always sign up later'
-                : 'No account needed to get started',
-            style: const TextStyle(color: CLColors.muted2, fontSize: 12),
+      child: GestureDetector(
+        onTap: _continueAsGuest,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: CLColors.muted.withOpacity(0.3)),
           ),
-          const SizedBox(height: 4),
-          TextButton(
-            onPressed: _continueAsGuest,
-            child: Text(
-              _isFromSettings ? '← Go back' : 'Continue as Guest  →',
-              style: const TextStyle(color: CLColors.muted, fontSize: 13),
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.person_outline, size: 16, color: CLColors.muted),
+              const SizedBox(width: 8),
+              Column(
+                children: const [
+                  Text(
+                    'Continue as Guest',
+                    style: TextStyle(color: CLColors.text, fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                  SizedBox(height: 1),
+                  Text(
+                    '${AppState.guestScanLimit} free scans/day · no account needed',
+                    style: TextStyle(color: CLColors.muted, fontSize: 10),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.arrow_forward_ios, size: 12, color: CLColors.muted),
+            ],
           ),
-          if (!_isFromSettings)
-            const Text(
-              '${AppState.guestScanLimit} free AI scans/day · no sync',
-              style: TextStyle(color: CLColors.muted2, fontSize: 11),
-            ),
-        ],
+        ),
       ),
     );
   }
