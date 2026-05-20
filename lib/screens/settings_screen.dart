@@ -661,7 +661,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       return;
                     }
                     setState(() => _nudgesOn = val);
-                    await NotificationService.setNudgesEnabled(val);
+                    final state = Provider.of<AppState>(context, listen: false);
+                    await NotificationService.setNudgesEnabled(
+                      val,
+                      caloriesEaten: state.totalCalories,
+                      calorieGoal: state.calorieGoal,
+                    );
                   },
                   activeColor: CLColors.accent,
                   inactiveTrackColor: CLColors.border,

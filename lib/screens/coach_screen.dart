@@ -1724,22 +1724,60 @@ class _RichChatContent extends StatelessWidget {
     );
   }
 
-  /// Renders inline bold (**text**) and keeps normal text
+  /// Renders inline **bold**, *italic*, and ***bold italic*** markdown.
   static Widget _buildRichLine(String line) {
+    // Regex matches: ***bold italic***, **bold**, or *italic*
+    // Order matters — longest delimiter first so *** isn't consumed as ** + *.
+    final regex = RegExp(r'\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*');
     final spans = <TextSpan>[];
-    final parts = line.split('**');
+    int cursor = 0;
 
-    for (int i = 0; i < parts.length; i++) {
-      if (parts[i].isEmpty) continue;
-      spans.add(TextSpan(
-        text: parts[i],
-        style: TextStyle(
-          color: i % 2 == 1 ? CLColors.text : CLColors.text.withOpacity(0.85),
-          fontWeight: i % 2 == 1 ? FontWeight.w600 : FontWeight.normal,
-          fontSize: 13,
-          height: 1.5,
-        ),
-      ));
+    const normalStyle = TextStyle(
+      color: CLColors.text, fontSize: 13, height: 1.5,
+      fontWeight: FontWeight.normal, fontStyle: FontStyle.normal,
+    );
+    final mutedStyle = normalStyle.copyWith(color: CLColors.text.withOpacity(0.85));
+
+    for (final match in regex.allMatches(line)) {
+      // Text before this match
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: line.substring(cursor, match.start), style: mutedStyle));
+      }
+
+      if (match.group(1) != null) {
+        // ***bold italic***
+        spans.add(TextSpan(
+          text: match.group(1),
+          style: normalStyle.copyWith(
+            color: CLColors.text,
+            fontWeight: FontWeight.w600,
+            fontStyle: FontStyle.italic,
+          ),
+        ));
+      } else if (match.group(2) != null) {
+        // **bold**
+        spans.add(TextSpan(
+          text: match.group(2),
+          style: normalStyle.copyWith(color: CLColors.text, fontWeight: FontWeight.w600),
+        ));
+      } else if (match.group(3) != null) {
+        // *italic*
+        spans.add(TextSpan(
+          text: match.group(3),
+          style: normalStyle.copyWith(color: CLColors.text, fontStyle: FontStyle.italic),
+        ));
+      }
+
+      cursor = match.end;
+    }
+
+    // Remaining text after last match
+    if (cursor < line.length) {
+      spans.add(TextSpan(text: line.substring(cursor), style: mutedStyle));
+    }
+
+    if (spans.isEmpty) {
+      spans.add(TextSpan(text: line, style: mutedStyle));
     }
 
     return RichText(text: TextSpan(children: spans));

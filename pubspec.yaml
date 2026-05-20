@@ -54,6 +54,9 @@ dependencies:
   # In-app purchases (Google Play Billing)
   in_app_purchase: ^3.2.0
 
+  # Speech-to-text (voice meal descriptions)
+  speech_to_text: ^7.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

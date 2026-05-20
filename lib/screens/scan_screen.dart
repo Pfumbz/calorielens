@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../app_state.dart';
 import '../models/models.dart';
 import '../services/openfoodfacts_service.dart';
@@ -47,6 +48,11 @@ class _ScanScreenState extends State<ScanScreen>
   BarcodeResult? _barcodeResult;
   bool _showServingPicker = false; // true = barcode found, awaiting serving size choice
 
+  // Voice input state
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _speechAvailable = false;
+  bool _isListening = false;
+
   // Animation for result panel appearing
   late AnimationController _resultAnim;
   late Animation<double> _resultFade;
@@ -66,6 +72,7 @@ class _ScanScreenState extends State<ScanScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _resultAnim, curve: Curves.easeOut));
     _recoverLostImage();
+    _initSpeech();
 
     // Wire up static callbacks for AppShell back-button handling
     ScanScreen.clearResult = _discardResult;
@@ -79,6 +86,7 @@ class _ScanScreenState extends State<ScanScreen>
     _barcodeNameCtrl.dispose();
     _customServingCtrl.dispose();
     _resultAnim.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -235,6 +243,8 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   void _switchMode(_ScanMode mode) {
+    // Stop voice input if switching away from Describe
+    if (_isListening) { _speech.stop(); _isListening = false; }
     setState(() {
       _scanMode = mode;
       _result = null;
@@ -624,16 +634,123 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   // ── TEXT INPUT ──────────────────────────────────────────────────────────
-  Widget _buildTextInput() {
-    return TextField(
-      controller: _textCtrl,
-      maxLines: 5,
-      style: const TextStyle(color: CLColors.text, fontSize: 14),
-      onChanged: (_) => setState(() {}),
-      decoration: const InputDecoration(
-        hintText: 'e.g. "Grilled chicken breast with brown rice and salad"',
-        alignLabelWithHint: true,
+  // ── SPEECH-TO-TEXT ──────────────────────────────────────────────────────
+  Future<void> _initSpeech() async {
+    _speechAvailable = await _speech.initialize(
+      onError: (error) {
+        if (mounted) setState(() => _isListening = false);
+      },
+      onStatus: (status) {
+        // 'done' or 'notListening' means the engine stopped
+        if (status == 'done' || status == 'notListening') {
+          if (mounted) setState(() => _isListening = false);
+        }
+      },
+    );
+    if (mounted) setState(() {});
+  }
+
+  void _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+      return;
+    }
+
+    if (!_speechAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Voice input is not available on this device'),
+          backgroundColor: CLColors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isListening = true);
+    await _speech.listen(
+      onResult: (result) {
+        setState(() {
+          _textCtrl.text = result.recognizedWords;
+          _textCtrl.selection = TextSelection.fromPosition(
+            TextPosition(offset: _textCtrl.text.length),
+          );
+        });
+      },
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 3),
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: true,
       ),
+    );
+  }
+
+  Widget _buildTextInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _textCtrl,
+          maxLines: 5,
+          style: const TextStyle(color: CLColors.text, fontSize: 14),
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            hintText: 'e.g. "Grilled chicken breast with brown rice and salad"',
+            alignLabelWithHint: true,
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Mic button
+        Center(
+          child: GestureDetector(
+            onTap: _toggleListening,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: _isListening ? CLColors.accent.withOpacity(0.15) : CLColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: _isListening ? CLColors.accent : CLColors.border,
+                  width: _isListening ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isListening ? Icons.stop_circle_outlined : Icons.mic_outlined,
+                    color: _isListening ? CLColors.accent : CLColors.muted,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isListening ? 'Listening…  Tap to stop' : 'Tap to describe by voice',
+                    style: TextStyle(
+                      color: _isListening ? CLColors.accent : CLColors.muted,
+                      fontSize: 13,
+                      fontWeight: _isListening ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                  if (_isListening) ...[
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: CLColors.accent.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

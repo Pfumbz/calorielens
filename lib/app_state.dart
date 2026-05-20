@@ -157,8 +157,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     // Prune old diary entries based on user tier
     unawaited(_pruneDiaryForTier());
 
-    // Check if coaching nudge should fire on app open
-    unawaited(NotificationService.checkAndScheduleNudge(
+    // Schedule coaching nudges (fires even when app is closed)
+    unawaited(NotificationService.scheduleNudges(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
     ));
@@ -346,8 +346,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       ));
     }
 
-    // Check if a coaching nudge should be scheduled
-    unawaited(NotificationService.checkAndScheduleNudge(
+    // Reschedule nudges with updated calorie data
+    unawaited(NotificationService.scheduleNudges(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
     ));
@@ -358,12 +358,20 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> removeEntry(int id) async {
     await _storage.removeDiaryEntry(id);
     _diary = _storage.getDiary();
+    unawaited(NotificationService.scheduleNudges(
+      caloriesEaten: totalCalories,
+      calorieGoal: _calorieGoal,
+    ));
     notifyListeners();
   }
 
   Future<void> clearAllEntries() async {
     await _storage.saveDiary([]);
     _diary = [];
+    unawaited(NotificationService.scheduleNudges(
+      caloriesEaten: totalCalories,
+      calorieGoal: _calorieGoal,
+    ));
     notifyListeners();
   }
 

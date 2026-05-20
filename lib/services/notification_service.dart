@@ -23,7 +23,6 @@ class NotificationService {
   static const _breakfastId = 100;
   static const _lunchId = 101;
   static const _dinnerId = 102;
-  static const _nudgeId = 200;
 
   // SharedPreferences keys
   static const _keyRemindersOn = 'notif_reminders_on';
@@ -144,11 +143,13 @@ class NotificationService {
     }
   }
 
-  static Future<void> setNudgesEnabled(bool value) async {
+  static Future<void> setNudgesEnabled(bool value, {int caloriesEaten = 0, int calorieGoal = 2000}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyNudgesOn, value);
-    if (!value) {
-      await _plugin.cancel(_nudgeId);
+    if (value) {
+      await scheduleNudges(caloriesEaten: caloriesEaten, calorieGoal: calorieGoal);
+    } else {
+      await cancelNudges();
     }
   }
 
@@ -327,56 +328,117 @@ class NotificationService {
   }
 
   // ── Coaching nudges ───────────────────────────────────────────────────────
-  /// Call this when the app opens or diary changes to check if a nudge is needed.
-  /// [caloriesEaten] = total calories logged today
-  /// [calorieGoal] = user's daily target
-  static Future<void> checkAndScheduleNudge({
+  // IDs for afternoon and evening nudge slots
+  static const _afternoonNudgeId = 200;
+  static const _eveningNudgeId = 201;
+
+  // Nudge schedule: afternoon at 2:30pm, evening at 7:30pm
+  static const _afternoonHour = 14;
+  static const _afternoonMin = 30;
+  static const _eveningHour = 19;
+  static const _eveningMin = 30;
+
+  /// Schedule smart nudges based on today's calorie data.
+  /// Call on app open, after diary add/remove, and when nudges are toggled on.
+  /// These fire even when the app is closed.
+  static Future<void> scheduleNudges({
     required int caloriesEaten,
     required int calorieGoal,
   }) async {
     if (!(await nudgesEnabled)) return;
 
-    final now = TimeOfDay.now();
-    final remaining = calorieGoal - caloriesEaten;
+    // Cancel any existing nudges so we replace with fresh data
+    await _plugin.cancel(_afternoonNudgeId);
+    await _plugin.cancel(_eveningNudgeId);
 
-    String? title;
-    String? body;
+    final now = tz.TZDateTime.now(tz.local);
 
-    // Afternoon check (2-4pm): if very few calories logged, nudge
-    if (now.hour >= 14 && now.hour < 16 && caloriesEaten < calorieGoal * 0.3) {
-      title = 'Heads up! 💡';
-      body = 'You\'ve only logged $caloriesEaten kcal today. Remember to track your meals for accurate insights.';
-    }
-    // Evening check (7-9pm): summary nudge
-    else if (now.hour >= 19 && now.hour < 21) {
-      if (remaining > 300) {
-        title = 'You\'re $remaining kcal under your goal 🎯';
-        body = 'Make sure you\'re eating enough! Log your dinner if you haven\'t already.';
-      } else if (remaining < -200) {
-        final over = -remaining;
-        title = 'You\'re ${over} kcal over your goal';
-        body = 'No worries — tomorrow is a fresh start. Staying aware is what matters!';
+    // ── Afternoon nudge (2:30pm): only if under 30% of goal ──
+    final afternoonTime = tz.TZDateTime(
+      tz.local, now.year, now.month, now.day,
+      _afternoonHour, _afternoonMin,
+    );
+    if (afternoonTime.isAfter(now) && caloriesEaten < calorieGoal * 0.3) {
+      final msg = caloriesEaten == 0
+          ? 'You haven\'t logged any meals today. Open CalorieLens to track what you eat!'
+          : 'You\'ve only logged $caloriesEaten kcal so far. Don\'t forget to track your meals!';
+      try {
+        await _plugin.zonedSchedule(
+          _afternoonNudgeId,
+          'Afternoon check-in 💡',
+          msg,
+          afternoonTime,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId, _channelName,
+              channelDescription: _channelDesc,
+              importance: Importance.high,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+            ),
+          ),
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          androidScheduleMode: AndroidScheduleMode.alarmClock,
+        );
+        debugPrint('NotificationService: ✅ Afternoon nudge scheduled for $afternoonTime');
+      } catch (e) {
+        debugPrint('NotificationService: ❌ Afternoon nudge failed: $e');
       }
     }
 
-    if (title != null && body != null) {
-      // Show nudge immediately (triggered by app usage, no need to schedule)
-      await _plugin.show(
-        _nudgeId,
-        title,
-        body,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDesc,
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
+    // ── Evening nudge (7:30pm): summary or encouragement ──
+    final eveningTime = tz.TZDateTime(
+      tz.local, now.year, now.month, now.day,
+      _eveningHour, _eveningMin,
+    );
+    if (eveningTime.isAfter(now)) {
+      final remaining = calorieGoal - caloriesEaten;
+      String title;
+      String body;
+
+      if (caloriesEaten == 0) {
+        title = 'No meals logged today 📋';
+        body = 'It\'s evening and your diary is empty. Even a quick entry helps build the habit!';
+      } else if (remaining > 300) {
+        title = 'You\'re $remaining kcal under your goal 🎯';
+        body = 'Have you had dinner? Log it to keep your tracking accurate.';
+      } else if (remaining < -200) {
+        title = 'Over goal by ${-remaining} kcal today';
+        body = 'No worries — awareness is what matters. Tomorrow is a fresh start!';
+      } else {
+        title = 'Looking good! 🔥';
+        body = 'You\'re close to your $calorieGoal kcal goal with $caloriesEaten kcal logged. Nice work!';
+      }
+
+      try {
+        await _plugin.zonedSchedule(
+          _eveningNudgeId,
+          title,
+          body,
+          eveningTime,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId, _channelName,
+              channelDescription: _channelDesc,
+              importance: Importance.high,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+            ),
           ),
-        ),
-      );
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          androidScheduleMode: AndroidScheduleMode.alarmClock,
+        );
+        debugPrint('NotificationService: ✅ Evening nudge scheduled for $eveningTime');
+      } catch (e) {
+        debugPrint('NotificationService: ❌ Evening nudge failed: $e');
+      }
     }
+  }
+
+  /// Cancel all coaching nudges
+  static Future<void> cancelNudges() async {
+    await _plugin.cancel(_afternoonNudgeId);
+    await _plugin.cancel(_eveningNudgeId);
   }
 
   // ── Random motivational messages (for variety) ────────────────────────────
