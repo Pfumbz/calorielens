@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app_state.dart';
 import '../services/auth_service.dart';
+import '../services/health_service.dart';
 import '../services/notification_service.dart';
 import '../theme.dart';
 import '../utils/pricing.dart';
@@ -87,6 +88,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _sectionLabel('PREFERENCES'),
               const SizedBox(height: 8),
               _buildPreferencesSection(),
+              const SizedBox(height: 24),
+
+              // ── HEALTH CONNECT ─────────────────────────────────
+              _sectionLabel('HEALTH CONNECT'),
+              const SizedBox(height: 8),
+              _buildHealthSection(state),
               const SizedBox(height: 24),
 
               // ── PROFILE ──────────────────────────────────────
@@ -726,6 +733,328 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: CLColors.muted, size: 16),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── HEALTH CONNECT SECTION ─────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  Widget _buildHealthSection(AppState state) {
+    final isEnabled = state.healthEnabled;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // Health Connect toggle
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: CLColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.monitor_heart_outlined,
+                      color: CLColors.accent, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('Health Connect',
+                          style: TextStyle(
+                              color: CLColors.text,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      SizedBox(height: 1),
+                      Text('Steps & calories from your watch',
+                          style: TextStyle(
+                              color: CLColors.muted, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: isEnabled,
+                  onChanged: (val) async {
+                    if (val) {
+                      // Check availability first
+                      final health = HealthService();
+                      final available = await health.isHealthConnectAvailable();
+                      if (!available) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                  'Health Connect is not installed. Opening Play Store…'),
+                              backgroundColor: CLColors.surface,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }
+                        await health.installHealthConnect();
+                        return;
+                      }
+
+                      // Request permissions
+                      final granted = await health.requestPermissions();
+                      if (!granted) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                  'Permission not granted. Please allow access in Health Connect settings.'),
+                              backgroundColor: CLColors.surface,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                    }
+                    await context.read<AppState>().setHealthEnabled(val);
+                  },
+                  activeColor: CLColors.accent,
+                  inactiveTrackColor: CLColors.border,
+                ),
+              ],
+            ),
+          ),
+
+          // Sub-settings (only visible when enabled)
+          if (isEnabled) ...[
+            const Divider(color: CLColors.border, height: 1),
+
+            // Auto-adjust goal toggle
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: CLColors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.track_changes,
+                        color: CLColors.green, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Auto-adjust calorie goal',
+                            style: TextStyle(
+                                color: CLColors.text,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
+                        SizedBox(height: 1),
+                        Text('Add activity bonus to daily target',
+                            style: TextStyle(
+                                color: CLColors.muted, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: state.autoAdjustGoal,
+                    onChanged: (val) =>
+                        context.read<AppState>().setAutoAdjustGoal(val),
+                    activeColor: CLColors.accent,
+                    inactiveTrackColor: CLColors.border,
+                  ),
+                ],
+              ),
+            ),
+
+            // Activity multiplier
+            if (state.autoAdjustGoal) ...[
+              const Divider(color: CLColors.border, height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: CLColors.muted.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.tune,
+                          color: CLColors.muted, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('Activity multiplier',
+                              style: TextStyle(
+                                  color: CLColors.text,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600)),
+                          SizedBox(height: 1),
+                          Text('How much of burned calories to add back',
+                              style: TextStyle(
+                                  color: CLColors.muted, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _showMultiplierPicker(state),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: CLColors.accentLo,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${(state.activityMultiplier * 100).round()}%',
+                          style: const TextStyle(
+                              color: CLColors.accent,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+
+          // Status line
+          if (isEnabled && state.stepsToday > 0) ...[
+            const Divider(color: CLColors.border, height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle,
+                      size: 14, color: CLColors.green),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${state.stepsToday} steps · ${state.activeCaloriesToday} kcal burned today',
+                    style: const TextStyle(
+                        color: CLColors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showMultiplierPicker(AppState state) {
+    final options = [
+      (0.4, '40%', 'Conservative — eat back less'),
+      (0.5, '50%', 'Moderate — balanced approach'),
+      (0.6, '60%', 'Recommended — good default'),
+      (0.7, '70%', 'Active — eat back more'),
+      (0.8, '80%', 'High — for very active users'),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: CLColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 16),
+            const Text('Activity multiplier',
+                style: TextStyle(
+                    color: CLColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            const Text(
+              'How much of your burned calories should be added back to your daily goal?',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: CLColors.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            ...options.map((opt) {
+              final isSelected =
+                  (state.activityMultiplier - opt.$1).abs() < 0.01;
+              return GestureDetector(
+                onTap: () {
+                  context.read<AppState>().setActivityMultiplier(opt.$1);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? CLColors.accentLo : CLColors.bg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? CLColors.accent.withOpacity(0.3)
+                          : CLColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(opt.$2,
+                          style: TextStyle(
+                              color: isSelected
+                                  ? CLColors.accent
+                                  : CLColors.text,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(opt.$3,
+                            style: const TextStyle(
+                                color: CLColors.muted, fontSize: 12)),
+                      ),
+                      if (isSelected)
+                        const Icon(Icons.check_circle,
+                            color: CLColors.accent, size: 18),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
         ),
       ),
     );

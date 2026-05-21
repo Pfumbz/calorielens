@@ -8,6 +8,11 @@
 <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 <uses-permission android:name="android.permission.VIBRATE" />
+<!-- Health Connect permissions (fitness watch data) -->
+<uses-permission android:name="android.permission.health.READ_STEPS" />
+<uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+<uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+<uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:label="calorielens"
@@ -44,6 +49,11 @@
                     android:host="login-callback" />
             </intent-filter>
         </activity>
+        <!-- Health Connect intent filter (required for health package) -->
+        <intent-filter>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent-filter>
+
         <!-- AdMob App ID — using test ID until app is on Play Store -->
         <!-- Production: ca-app-pub-5237846834490979~1166433546 -->
         <meta-data
@@ -62,6 +72,10 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Health Connect availability check -->
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

@@ -6,10 +6,12 @@ import 'services/storage_service.dart';
 import 'services/supabase_service.dart';
 import 'services/backend_service.dart';
 import 'services/purchase_service.dart';
+import 'services/health_service.dart';
 
 class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final _storage = StorageService();
   final _purchases = PurchaseService();
+  final _health = HealthService();
 
   /// Tracks the date when data was last loaded so we can detect day rollover.
   String _lastLoadedDate = '';
@@ -26,6 +28,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   int _backendScansToday = 0;
   int _backendChatsToday = 0;
 
+  // ── Health / fitness watch state ────────────────────────────────────
+  bool _healthEnabled = false;
+  bool _autoAdjustGoal = true;
+  double _activityMultiplier = 0.6;
+  int _stepsToday = 0;
+  int _activeCaloriesToday = 0;
+
   // ── Meal plan state ───────────────────────────────────────────────────
   List<String> _savedPlanIds = [];
 
@@ -40,6 +49,25 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool get isAnonymous => SupabaseService.isAnonymous;
   bool get isRealUser => SupabaseService.isRealUser;
 
+  // ── Health getters ─────────────────────────────────────────────────
+  bool get healthEnabled => _healthEnabled;
+  bool get autoAdjustGoal => _autoAdjustGoal;
+  double get activityMultiplier => _activityMultiplier;
+  int get stepsToday => _stepsToday;
+  int get activeCaloriesToday => _activeCaloriesToday;
+  HealthService get health => _health;
+
+  /// The activity bonus (extra kcal) based on today's active calories.
+  int get activityBonus => _healthEnabled && _autoAdjustGoal
+      ? HealthService.activityBonus(_activeCaloriesToday, _activityMultiplier)
+      : 0;
+
+  /// The effective calorie goal (base + activity bonus).
+  int get effectiveCalorieGoal => _calorieGoal + activityBonus;
+
+  /// Base calorie goal (without activity adjustment).
+  int get baseCalorieGoal => _calorieGoal;
+
   List<String> get savedPlanIds => _savedPlanIds;
   bool isPlanSaved(String planId) => _savedPlanIds.contains(planId);
 
@@ -47,7 +75,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   int get totalProtein  => _diary.fold(0, (s, e) => s + e.protein);
   int get totalCarbs    => _diary.fold(0, (s, e) => s + e.carbs);
   int get totalFat      => _diary.fold(0, (s, e) => s + e.fat);
-  int get caloriesLeft  => (_calorieGoal - totalCalories).clamp(0, 9999);
+  int get caloriesLeft  => (effectiveCalorieGoal - totalCalories).clamp(0, 9999);
   bool get hasApiKey    => _apiKey.isNotEmpty;
 
   // Scan limits per tier (public for UI copy)
@@ -131,6 +159,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _savedPlanIds = _storage.savedPlanIds;
     _lastLoadedDate = _todayString();
 
+    // Load health preferences and cached values
+    _healthEnabled = _storage.healthConnectEnabled;
+    _autoAdjustGoal = _storage.autoAdjustGoal;
+    _activityMultiplier = _storage.activityMultiplier;
+    _stepsToday = _storage.cachedHealthSteps;
+    _activeCaloriesToday = _storage.cachedHealthCalories;
+
     // Load cached cloud counters (so offline mode shows correct values)
     _backendScansToday = _storage.cachedCloudScans;
     _backendChatsToday = _storage.cachedCloudChats;
@@ -141,6 +176,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     if (_supabaseUser != null) {
       // Refresh from cloud if online — updates counters from server
       await _refreshFromCloud();
+    }
+
+    // Refresh health data if enabled
+    if (_healthEnabled) {
+      unawaited(_refreshHealthData());
     }
 
     // Initialise in-app purchases and listen for subscription changes
@@ -204,6 +244,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     // Refresh from cloud if signed in (gets accurate scan count for today)
     if (isSignedIn) {
       unawaited(_refreshFromCloud());
+    }
+
+    // Refresh health data on resume (picks up new steps/calories)
+    if (_healthEnabled) {
+      unawaited(_refreshHealthData());
     }
 
     notifyListeners();
@@ -460,6 +505,80 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Restore previous purchases from Google Play.
   Future<void> restorePurchases() async {
     await _purchases.restorePurchases();
+  }
+
+  // ── Health Connect ───────────────────────────────────────────────────────
+
+  /// Enable/disable Health Connect integration.
+  Future<void> setHealthEnabled(bool enabled) async {
+    await _storage.setHealthConnectEnabled(enabled);
+    _healthEnabled = enabled;
+    if (enabled) {
+      await _refreshHealthData();
+    } else {
+      _stepsToday = 0;
+      _activeCaloriesToday = 0;
+      _health.resetDaily();
+    }
+    notifyListeners();
+  }
+
+  /// Toggle auto-adjust calorie goal based on activity.
+  Future<void> setAutoAdjustGoal(bool enabled) async {
+    await _storage.setAutoAdjustGoal(enabled);
+    _autoAdjustGoal = enabled;
+    notifyListeners();
+  }
+
+  /// Set the activity multiplier (0.0–1.0).
+  Future<void> setActivityMultiplier(double multiplier) async {
+    await _storage.setActivityMultiplier(multiplier);
+    _activityMultiplier = multiplier;
+    notifyListeners();
+  }
+
+  /// Fetch latest health data from Health Connect.
+  Future<void> _refreshHealthData() async {
+    try {
+      // Check permissions first (non-blocking)
+      final hasPerm = await _health.hasPermissions();
+      if (!hasPerm) return;
+
+      final data = await _health.fetchTodayActivity();
+      _stepsToday = data.steps;
+      _activeCaloriesToday = data.activeCalories;
+
+      // Cache for offline display
+      unawaited(_storage.setCachedHealthSteps(data.steps));
+      unawaited(_storage.setCachedHealthCalories(data.activeCalories));
+
+      notifyListeners();
+    } catch (_) {
+      // Health data unavailable — silently continue
+    }
+  }
+
+  /// Force refresh health data (called from UI pull-to-refresh, etc.)
+  Future<void> refreshHealth() async {
+    if (_healthEnabled) {
+      await _refreshHealthData();
+    }
+  }
+
+  /// Build an activity context string for the AI coach.
+  String? get activityContext {
+    if (!_healthEnabled || (_stepsToday == 0 && _activeCaloriesToday == 0)) {
+      return null;
+    }
+    final buf = StringBuffer();
+    buf.writeln('\nACTIVITY DATA (from fitness watch via Health Connect):');
+    buf.writeln('Steps today: $_stepsToday');
+    buf.writeln('Active calories burned: $_activeCaloriesToday kcal');
+    if (_autoAdjustGoal && activityBonus > 0) {
+      buf.writeln('Activity bonus added to calorie goal: +$activityBonus kcal (${(_activityMultiplier * 100).round()}% of active calories)');
+      buf.writeln('Effective calorie goal: $effectiveCalorieGoal kcal (base: $_calorieGoal + bonus: $activityBonus)');
+    }
+    return buf.toString();
   }
 
   // ── Meal plan favourites ──────────────────────────────────────────────────

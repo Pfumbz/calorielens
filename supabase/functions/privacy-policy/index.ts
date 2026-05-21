@@ -32,7 +32,7 @@ const html = `<!DOCTYPE html>
   <div class="container">
     <h1>Privacy Policy</h1>
     <p style="font-size: 20px; color: #F5EDE0;">Calorie<span class="brand">Lens</span></p>
-    <p class="updated">Last updated: 2 May 2026</p>
+    <p class="updated">Last updated: 20 May 2026</p>
 
     <p>CalorieLens (&ldquo;the App&rdquo;) is developed and operated by PC Mac Studios (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;). This Privacy Policy explains what information we collect, how we use it, and your choices regarding your data.</p>
 
@@ -43,6 +43,7 @@ const html = `<!DOCTYPE html>
       <li><strong>Profile information:</strong> You may optionally provide your name, age, weight, and height to receive personalised calorie targets. This data is stored in your user profile.</li>
       <li><strong>Diary entries:</strong> Meals you log (food names, calorie and macro estimates, timestamps) are stored to track your daily nutrition.</li>
       <li><strong>Scan data:</strong> When you scan a meal using the camera, the image is sent to our AI service (Anthropic Claude) for nutritional analysis. We do not permanently store the images &mdash; they are processed in real time and discarded.</li>
+      <li><strong>Voice input:</strong> You may optionally use your device&rsquo;s microphone to describe meals by voice. Speech is processed entirely on your device using Android&rsquo;s built-in speech recogniser. CalorieLens receives only the transcribed text &mdash; no audio is recorded, stored, or transmitted by the App.</li>
       <li><strong>Usage data:</strong> We track your daily scan and chat counts to manage service limits. No browsing history, location data, or device identifiers are collected.</li>
     </ul>
 
@@ -109,9 +110,9 @@ const html = `<!DOCTYPE html>
 serve((_req) => {
   return new Response(html, {
     status: 200,
-    headers: new Headers({
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'public, max-age=86400',
-    }),
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'public, max-age=86400',
+    },
   })
 })

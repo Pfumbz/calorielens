@@ -36,7 +36,8 @@ class _CoachScreenState extends State<CoachScreen> {
   // ── System Prompt (tiered) ────────────────────────────────────────────
   String _buildSystemPrompt(AppState state) {
     final diary = state.diary;
-    final goal = state.calorieGoal;
+    final goal = state.effectiveCalorieGoal;
+    final baseGoal = state.baseCalorieGoal;
     final used = state.totalCalories;
     final name = state.profile.name;
     final p = state.profile;
@@ -59,12 +60,22 @@ class _CoachScreenState extends State<CoachScreen> {
     }
 
     buf.writeln('\nTODAY\'S DATA:');
-    buf.writeln('Calorie goal: $goal kcal');
+    if (state.activityBonus > 0) {
+      buf.writeln('Calorie goal: $goal kcal (base: $baseGoal + activity bonus: ${state.activityBonus})');
+    } else {
+      buf.writeln('Calorie goal: $goal kcal');
+    }
     buf.writeln(
         'Consumed: $used kcal | Remaining: ${(goal - used).clamp(0, 9999)} kcal');
     buf.writeln(
         'Protein: ${state.totalProtein}g | Carbs: ${state.totalCarbs}g | Fat: ${state.totalFat}g');
     buf.writeln('\nTODAY\'S MEALS:\n$diaryStr');
+
+    // Activity data from fitness watch (if connected)
+    final activityCtx = state.activityContext;
+    if (activityCtx != null) {
+      buf.writeln(activityCtx);
+    }
 
     if (isPro) {
       buf.writeln(
@@ -125,6 +136,9 @@ class _CoachScreenState extends State<CoachScreen> {
 
       buf.writeln(
           '\nYou are the user\'s PRO Smart Coach — warm, supportive, and action-oriented. '
+          'If activity data is available, factor it into your advice — acknowledge their effort, '
+          'explain how the activity bonus adjusts their calorie budget, and tailor meal suggestions '
+          'to support recovery on high-activity days. '
           'Reference their weekly patterns and specific meals they\'ve logged. '
           'Identify trends gently (e.g. "I noticed protein has been a bit low on a few days this week" '
           'rather than "you\'ve been failing to hit protein targets"). '
@@ -142,6 +156,7 @@ class _CoachScreenState extends State<CoachScreen> {
     } else {
       buf.writeln(
           '\nBe warm, concise, and encouraging. Keep responses under 120 words. '
+          'If activity data is available, mention their steps or calories burned and how it relates to their goal. '
           'When the user\'s data is limited, mention that logging more meals will help you give better advice. '
           'Never be judgmental about eating choices — focus on what they can add, not what they did wrong. '
           'Use **bold** for key numbers, bullet points for lists. '
@@ -154,7 +169,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
   // ── Macro targets ─────────────────────────────────────────────────────
   _MacroTargets _getTargets(AppState state) {
-    final goal = state.calorieGoal;
+    final goal = state.effectiveCalorieGoal;
     final w = state.profile.weight;
     final protein = w > 0 ? (w * 1.6).round() : 120;
     final fat = (goal * 0.25 / 9).round();
@@ -290,7 +305,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
     setState(() => _suggestionsLoading = true);
 
-    final remaining = state.calorieGoal - state.totalCalories;
+    final remaining = state.effectiveCalorieGoal - state.totalCalories;
     final hour = DateTime.now().hour;
     final mealTime = hour < 11
         ? 'breakfast'
@@ -823,6 +838,12 @@ class _CoachScreenState extends State<CoachScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 10),
+          // 0. Activity summary strip (if health connected)
+          if (state.healthEnabled && (state.stepsToday > 0 || state.activeCaloriesToday > 0))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildActivityStrip(state),
+            ),
           // 1. Today's AI Insight (replaces calorie ring)
           _buildProInsightCard(state),
           const SizedBox(height: 16),
@@ -840,9 +861,67 @@ class _CoachScreenState extends State<CoachScreen> {
     );
   }
 
+  // ── 0. Activity Strip (Pro, when health connected) ────────────────────
+  Widget _buildActivityStrip(AppState state) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: CLColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _activityStripItem(
+              Icons.directions_walk,
+              CLColors.accent,
+              '${state.stepsToday}',
+              'steps today',
+            ),
+          ),
+          Container(width: 1, height: 28, color: CLColors.border),
+          Expanded(
+            child: _activityStripItem(
+              Icons.local_fire_department,
+              CLColors.red,
+              '${state.activeCaloriesToday} kcal',
+              'burned',
+            ),
+          ),
+          Container(width: 1, height: 28, color: CLColors.border),
+          Expanded(
+            child: _activityStripItem(
+              Icons.restaurant_outlined,
+              CLColors.text,
+              '${state.caloriesLeft}',
+              'kcal remaining',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityStripItem(IconData icon, Color color, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 14),
+        const SizedBox(height: 3),
+        Text(value,
+            style: TextStyle(
+                color: color, fontSize: 13, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center),
+        Text(label,
+            style: const TextStyle(color: CLColors.muted, fontSize: 9),
+            textAlign: TextAlign.center),
+      ],
+    );
+  }
+
   // ── 1. Today's AI Insight (Pro) ───────────────────────────────────────
   Widget _buildProInsightCard(AppState state) {
-    final remaining = (state.calorieGoal - state.totalCalories).clamp(0, 9999);
+    final remaining = (state.effectiveCalorieGoal - state.totalCalories).clamp(0, 9999);
     final mealsLogged = state.diary.length;
 
     return Container(

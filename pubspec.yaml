@@ -57,6 +57,9 @@ dependencies:
   # Speech-to-text (voice meal descriptions)
   speech_to_text: ^7.0.0
 
+  # Health Connect / HealthKit (fitness watch data)
+  health: ^11.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

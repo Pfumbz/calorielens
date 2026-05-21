@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.pcmacstudios.calorielens"
-        minSdk = flutter.minSdkVersion
+        minSdk = 26 // Health Connect requires API 26+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

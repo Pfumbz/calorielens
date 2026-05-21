@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
+import '../services/health_service.dart';
 import '../widgets/ad_banner.dart';
 import 'history_screen.dart';
 import 'week_report_screen.dart';
@@ -26,7 +27,13 @@ class TodayScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 16),
               _buildTitle(state),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              // Activity card or onboarding prompt
+              if (state.healthEnabled)
+                _buildActivityCard(state)
+              else if (!StorageService().healthOnboardingDismissed)
+                _HealthOnboardingPrompt(),
+              const SizedBox(height: 12),
               _buildCalorieRing(context, state),
               const SizedBox(height: 12),
               _buildMacroBars(state),
@@ -126,12 +133,141 @@ class TodayScreen extends StatelessWidget {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // ACTIVITY CARD (Health Connect)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildActivityCard(AppState state) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.border),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Row(
+            children: [
+              const Icon(Icons.monitor_heart_outlined,
+                  color: CLColors.accent, size: 18),
+              const SizedBox(width: 8),
+              const Text('Activity',
+                  style: TextStyle(
+                      color: CLColors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text('via Health Connect',
+                  style: TextStyle(
+                      color: CLColors.muted.withOpacity(0.5), fontSize: 10)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Steps + Calories row
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: CLColors.bg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.directions_walk,
+                          color: CLColors.accent, size: 20),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatNumber(state.stepsToday),
+                        style: const TextStyle(
+                            color: CLColors.text,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text('steps',
+                          style: TextStyle(color: CLColors.muted, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: CLColors.bg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.local_fire_department,
+                          color: CLColors.red, size: 20),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${state.activeCaloriesToday}',
+                        style: const TextStyle(
+                            color: CLColors.text,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text('kcal burned',
+                          style: TextStyle(color: CLColors.muted, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Activity bonus line (if auto-adjust is on)
+          if (state.autoAdjustGoal && state.activityBonus > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: CLColors.greenLo,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: CLColors.green.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_circle_outline,
+                      size: 14, color: CLColors.green),
+                  const SizedBox(width: 6),
+                  Text(
+                    '+${state.activityBonus} kcal activity bonus added to goal',
+                    style: const TextStyle(
+                        color: CLColors.green,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatNumber(int n) {
+    if (n >= 1000) {
+      return '${(n / 1000).toStringAsFixed(n % 1000 == 0 ? 0 : 1)}k'.replaceAll('.0k', 'k');
+    }
+    return n.toString();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // CALORIE RING
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildCalorieRing(BuildContext context, AppState state) {
     final used = state.totalCalories;
-    final goal = state.calorieGoal;
+    final goal = state.effectiveCalorieGoal;
     final pct  = goal > 0 ? (used / goal).clamp(0.0, 1.5) : 0.0;
     final left = goal - used;
     final isOver = left < 0;
@@ -185,7 +321,23 @@ class TodayScreen extends StatelessWidget {
             children: [
               _ringStatCol('$used', 'Eaten', CLColors.text),
               Container(width: 1, height: 28, color: CLColors.border),
-              _ringStatCol('$goal', 'Goal', CLColors.muted),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$goal',
+                      style: const TextStyle(color: CLColors.muted, fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(
+                    state.activityBonus > 0
+                        ? '${state.baseCalorieGoal}+${state.activityBonus}'
+                        : 'Goal',
+                    style: TextStyle(
+                      color: state.activityBonus > 0 ? CLColors.green : CLColors.muted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
               Container(width: 1, height: 28, color: CLColors.border),
               GestureDetector(
                 onTap: () => _showGoalEditor(context, context.read<AppState>()),
@@ -215,7 +367,7 @@ class TodayScreen extends StatelessWidget {
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildMacroBars(AppState state) {
-    final goal = state.calorieGoal;
+    final goal = state.effectiveCalorieGoal;
     final proteinTarget = (goal * 0.25 / 4).round();
     final carbsTarget   = (goal * 0.50 / 4).round();
     final fatTarget     = (goal * 0.25 / 9).round();
@@ -275,7 +427,7 @@ class TodayScreen extends StatelessWidget {
     final logged = cals.where((c) => c > 0).length;
     final avg = logged > 0 ? cals.where((c) => c > 0).reduce((a, b) => a + b) ~/ logged : 0;
     final maxCal = cals.reduce((a, b) => a > b ? a : b);
-    final barMax = maxCal > 0 ? maxCal.toDouble() : state.calorieGoal.toDouble();
+    final barMax = maxCal > 0 ? maxCal.toDouble() : state.effectiveCalorieGoal.toDouble();
 
     return GestureDetector(
       onTap: () {
@@ -346,7 +498,7 @@ class TodayScreen extends StatelessWidget {
                   final v = cals[i].toDouble();
                   final barH = barMax > 0 ? (v / barMax * 50).clamp(0.0, 50.0) : 0.0;
                   final isToday = i == 6;
-                  final overGoal = v > state.calorieGoal && v > 0;
+                  final overGoal = v > state.effectiveCalorieGoal && v > 0;
                   // Dynamic labels: each bar is (today - 6 + i) days
                   const dayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
                   final dayDate = DateTime.now().subtract(Duration(days: 6 - i));
@@ -745,6 +897,164 @@ class TodayScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Health Connect onboarding prompt
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _HealthOnboardingPrompt extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CLColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.accent.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          // Icon + title
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: CLColors.accentLo,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.monitor_heart_outlined,
+                color: CLColors.accent, size: 24),
+          ),
+          const SizedBox(height: 10),
+          const Text('Connect your fitness watch',
+              style: TextStyle(
+                  color: CLColors.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          const Text(
+            'See your steps and calories burned. Your calorie goal adjusts automatically on active days.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: CLColors.muted, fontSize: 12, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          // Features
+          _featureRow(Icons.directions_walk, 'Daily steps and active calories'),
+          const SizedBox(height: 6),
+          _featureRow(Icons.track_changes, 'Smart calorie goal adjustment'),
+          const SizedBox(height: 6),
+          _featureRow(Icons.chat_outlined, 'Activity-aware coaching tips'),
+          const SizedBox(height: 14),
+          // Buttons
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    final state = context.read<AppState>();
+                    final health = HealthService();
+
+                    // Check availability
+                    final available = await health.isHealthConnectAvailable();
+                    if (!available) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                                'Health Connect is not installed. Opening Play Store…'),
+                            backgroundColor: CLColors.surface,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      }
+                      await health.installHealthConnect();
+                      return;
+                    }
+
+                    // Request permissions
+                    final granted = await health.requestPermissions();
+                    if (granted) {
+                      await state.setHealthEnabled(true);
+                    } else if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text(
+                              'Permission not granted. You can enable this later in Settings.'),
+                          backgroundColor: CLColors.surface,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: CLColors.accent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('Connect',
+                          style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    StorageService().setHealthOnboardingDismissed(true);
+                    // Force rebuild
+                    (context as Element).markNeedsBuild();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: CLColors.surface2,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('Not now',
+                          style: TextStyle(
+                              color: CLColors.muted, fontSize: 14)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _featureRow(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: CLColors.bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: CLColors.accent, size: 16),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(color: CLColors.muted, fontSize: 12)),
+          ),
+        ],
       ),
     );
   }

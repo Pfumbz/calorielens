@@ -203,6 +203,31 @@ class StorageService {
 
   bool isPlanSaved(String planId) => savedPlanIds.contains(planId);
 
+  // ── Health Connect preferences ───────────────────────────────────
+  bool get healthConnectEnabled => _prefs.getBool('cl6_health_enabled') ?? false;
+  Future<void> setHealthConnectEnabled(bool v) => _prefs.setBool('cl6_health_enabled', v);
+
+  bool get autoAdjustGoal => _prefs.getBool('cl6_health_auto_adjust') ?? true;
+  Future<void> setAutoAdjustGoal(bool v) => _prefs.setBool('cl6_health_auto_adjust', v);
+
+  /// Activity multiplier: how much of burned calories to add back (0.0–1.0).
+  double get activityMultiplier => _prefs.getDouble('cl6_health_multiplier') ?? 0.6;
+  Future<void> setActivityMultiplier(double v) => _prefs.setDouble('cl6_health_multiplier', v);
+
+  /// Cached health data (survives restarts for offline display).
+  String get _healthStepsKey => 'cl6_health_steps_${_dateKey(DateTime.now())}';
+  String get _healthCalKey => 'cl6_health_cal_${_dateKey(DateTime.now())}';
+
+  int get cachedHealthSteps => _prefs.getInt(_healthStepsKey) ?? 0;
+  int get cachedHealthCalories => _prefs.getInt(_healthCalKey) ?? 0;
+
+  Future<void> setCachedHealthSteps(int v) => _prefs.setInt(_healthStepsKey, v);
+  Future<void> setCachedHealthCalories(int v) => _prefs.setInt(_healthCalKey, v);
+
+  /// Whether the user has dismissed the Health Connect onboarding prompt.
+  bool get healthOnboardingDismissed => _prefs.getBool('cl6_health_onboard_dismissed') ?? false;
+  Future<void> setHealthOnboardingDismissed(bool v) => _prefs.setBool('cl6_health_onboard_dismissed', v);
+
   // ── AI-generated meal plans (JSON strings) ───────────────────────
   List<String> get generatedPlansJson {
     return _prefs.getStringList('cl5_gen_plans') ?? [];
