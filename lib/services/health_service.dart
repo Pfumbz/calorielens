@@ -12,7 +12,7 @@ class HealthService {
   // The health data types we read
   static const _types = [
     HealthDataType.STEPS,
-    HealthDataType.ACTIVE_CALORIES_BURNED,
+    HealthDataType.ACTIVE_ENERGY_BURNED,
     HealthDataType.TOTAL_CALORIES_BURNED,
   ];
 
@@ -123,7 +123,7 @@ class HealthService {
           case HealthDataType.STEPS:
             totalSteps += numericValue;
             break;
-          case HealthDataType.ACTIVE_CALORIES_BURNED:
+          case HealthDataType.ACTIVE_ENERGY_BURNED:
             totalActiveCal += numericValue;
             break;
           case HealthDataType.TOTAL_CALORIES_BURNED:
