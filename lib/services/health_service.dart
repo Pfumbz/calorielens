@@ -37,13 +37,20 @@ class HealthService {
     try {
       if (Platform.isAndroid) {
         final status = await Health().getHealthConnectSdkStatus();
-        return status == HealthConnectSdkStatus.sdkAvailable;
+        debugPrint('HealthService: SDK status = $status');
+        // Accept both sdkAvailable and sdkUnavailableProviderUpdateRequired
+        // (the latter means HC is present but needs an update — permissions still work)
+        return status == HealthConnectSdkStatus.sdkAvailable ||
+            status == HealthConnectSdkStatus.sdkUnavailableProviderUpdateRequired;
       }
       // iOS: HealthKit is always available on iOS devices
       if (Platform.isIOS) return true;
       return false;
     } catch (e) {
       debugPrint('HealthService: availability check failed: $e');
+      // If the check itself throws, HC might still work — return true so
+      // requestPermissions can try and give a definitive answer.
+      if (Platform.isAndroid) return true;
       return false;
     }
   }
@@ -61,10 +68,12 @@ class HealthService {
   /// Returns true if granted.
   Future<bool> requestPermissions() async {
     try {
+      debugPrint('HealthService: requesting permissions for $_types');
       final granted = await Health().requestAuthorization(
         _types,
         permissions: _permissions,
       );
+      debugPrint('HealthService: permissions granted = $granted');
       _isAuthorized = granted;
       return granted;
     } catch (e) {
