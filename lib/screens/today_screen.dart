@@ -290,36 +290,126 @@ class TodayScreen extends StatelessWidget {
 
     final color = isDeficit ? CLColors.green : CLColors.red;
     final bgColor = isDeficit ? CLColors.greenLo : CLColors.redLo;
-    final borderColor = isDeficit ? CLColors.green.withOpacity(0.2) : CLColors.red.withOpacity(0.2);
-    final icon = isDeficit ? Icons.trending_down : Icons.trending_up;
-    final label = isDeficit ? 'deficit' : 'surplus';
+    final borderColor = isDeficit
+        ? CLColors.green.withOpacity(0.15)
+        : CLColors.red.withOpacity(0.15);
+    final label = isDeficit ? 'DEFICIT' : 'SURPLUS';
+    final emoji = isDeficit ? '↓' : '↑';
+
+    // Bar proportions: how much of eaten vs burned fills the bar
+    final total = eaten + burned;
+    final eatenFrac = total > 0 ? eaten / total : 0.0;
+    final burnedFrac = total > 0 ? burned / total : 0.0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
+          // Top row: net number + label
+          Row(
+            children: [
+              // Net calorie badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$emoji $absNet',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'kcal $label',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                isDeficit ? 'On track' : 'Over budget',
+                style: TextStyle(
+                  color: color.withOpacity(0.6),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Visual bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 6,
+              child: Row(
                 children: [
-                  TextSpan(
-                    text: '$absNet kcal $label',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  TextSpan(
-                    text: '  ·  $eaten eaten − $burned burned',
-                  ),
+                  if (eatenFrac > 0)
+                    Flexible(
+                      flex: (eatenFrac * 100).round().clamp(1, 100),
+                      child: Container(color: CLColors.accent),
+                    ),
+                  if (burnedFrac > 0)
+                    Flexible(
+                      flex: (burnedFrac * 100).round().clamp(1, 100),
+                      child: Container(color: CLColors.green),
+                    ),
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 8),
+          // Labels below bar
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: CLColors.accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '$eaten eaten',
+                style: const TextStyle(
+                  color: CLColors.muted,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: CLColors.green,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '$burned burned',
+                style: const TextStyle(
+                  color: CLColors.muted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
         ],
       ),
