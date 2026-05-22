@@ -37,7 +37,7 @@ class TodayScreen extends StatelessWidget {
               const SizedBox(height: 12),
               // Activity card or onboarding prompt
               if (state.healthEnabled)
-                _buildActivityCard(state)
+                _buildActivityCard(context, state)
               else if (!StorageService().healthOnboardingDismissed)
                 _HealthOnboardingPrompt(),
               const SizedBox(height: 12),
@@ -144,7 +144,7 @@ class TodayScreen extends StatelessWidget {
   // ACTIVITY CARD (Health Connect)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildActivityCard(AppState state) {
+  Widget _buildActivityCard(BuildContext context, AppState state) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
