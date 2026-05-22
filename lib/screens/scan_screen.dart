@@ -72,7 +72,6 @@ class _ScanScreenState extends State<ScanScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _resultAnim, curve: Curves.easeOut));
     _recoverLostImage();
-    _initSpeech();
 
     // Wire up static callbacks for AppShell back-button handling
     ScanScreen.clearResult = _discardResult;
@@ -661,15 +660,22 @@ class _ScanScreenState extends State<ScanScreen>
       return;
     }
 
+    // Lazy-init: only request mic permission when user first taps the button
     if (!_speechAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Voice input is not available on this device'),
-          backgroundColor: CLColors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      await _initSpeech();
+    }
+
+    if (!_speechAvailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Voice input is not available on this device. Please allow microphone access.'),
+            backgroundColor: CLColors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
       return;
     }
 

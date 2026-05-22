@@ -207,7 +207,7 @@ class StorageService {
   bool get healthConnectEnabled => _prefs.getBool('cl6_health_enabled') ?? false;
   Future<void> setHealthConnectEnabled(bool v) => _prefs.setBool('cl6_health_enabled', v);
 
-  bool get autoAdjustGoal => _prefs.getBool('cl6_health_auto_adjust') ?? true;
+  bool get autoAdjustGoal => _prefs.getBool('cl6_health_auto_adjust') ?? false;
   Future<void> setAutoAdjustGoal(bool v) => _prefs.setBool('cl6_health_auto_adjust', v);
 
   /// Activity multiplier: how much of burned calories to add back (0.0–1.0).
