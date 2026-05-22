@@ -1087,6 +1087,12 @@ class _ScanScreenState extends State<ScanScreen>
   // ── SCAN LIMIT BAR ──────────────────────────────────────────────────────
   // ── ERROR ────────────────────────────────────────────────────────────────
   Widget _buildError() {
+    final isRetryable = _error != null &&
+        !_error!.contains('limit') &&
+        !_error!.contains('Limit') &&
+        !_error!.contains('Enter a description') &&
+        !_error!.contains('Select an image');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -1094,7 +1100,32 @@ class _ScanScreenState extends State<ScanScreen>
         color: CLColors.redLo, borderRadius: BorderRadius.circular(10),
         border: Border.all(color: CLColors.red.withOpacity(0.3)),
       ),
-      child: Text('$_error', style: const TextStyle(color: CLColors.red, fontSize: 13)),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text('$_error',
+                style: const TextStyle(color: CLColors.red, fontSize: 13)),
+          ),
+          if (isRetryable) ...[
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: _analyse,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: CLColors.red.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('Retry',
+                    style: TextStyle(
+                        color: CLColors.red,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

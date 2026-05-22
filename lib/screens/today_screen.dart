@@ -20,9 +20,16 @@ class TodayScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
+        child: RefreshIndicator(
+          color: CLColors.accent,
+          backgroundColor: CLColors.surface,
+          onRefresh: () async {
+            await state.refreshHealth();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
@@ -98,6 +105,7 @@ class TodayScreen extends StatelessWidget {
             ],
           ),
         ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.small(
         backgroundColor: CLColors.accent,
@@ -161,6 +169,12 @@ class TodayScreen extends StatelessWidget {
               Text('via Health Connect',
                   style: TextStyle(
                       color: CLColors.muted.withOpacity(0.5), fontSize: 10)),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => context.read<AppState>().refreshHealth(),
+                child: Icon(Icons.refresh,
+                    color: CLColors.muted.withOpacity(0.5), size: 16),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -249,6 +263,11 @@ class TodayScreen extends StatelessWidget {
               ),
             ),
           ],
+          // Calorie balance (surplus / deficit)
+          if (state.activeCaloriesToday > 0 || state.totalCalories > 0) ...[
+            const SizedBox(height: 10),
+            _buildCalorieBalance(state),
+          ],
         ],
       ),
     );
@@ -259,6 +278,52 @@ class TodayScreen extends StatelessWidget {
       return '${(n / 1000).toStringAsFixed(n % 1000 == 0 ? 0 : 1)}k'.replaceAll('.0k', 'k');
     }
     return n.toString();
+  }
+
+  // ── Calorie balance (surplus / deficit) ───────────────────────────────
+  Widget _buildCalorieBalance(AppState state) {
+    final eaten = state.totalCalories;
+    final burned = state.activeCaloriesToday;
+    final net = eaten - burned;
+    final isDeficit = net <= 0;
+    final absNet = net.abs();
+
+    final color = isDeficit ? CLColors.green : CLColors.red;
+    final bgColor = isDeficit ? CLColors.greenLo : CLColors.redLo;
+    final borderColor = isDeficit ? CLColors.green.withOpacity(0.2) : CLColors.red.withOpacity(0.2);
+    final icon = isDeficit ? Icons.trending_down : Icons.trending_up;
+    final label = isDeficit ? 'deficit' : 'surplus';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
+                children: [
+                  TextSpan(
+                    text: '$absNet kcal $label',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(
+                    text: '  ·  $eaten eaten − $burned burned',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

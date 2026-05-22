@@ -13,29 +13,43 @@ String friendlyError(dynamic error) {
       msg.contains('errno = 101') ||
       msg.contains('errno = 104') ||
       msg.contains('errno = 111')) {
-    return 'No internet connection. Please check your network and try again.';
+    return 'No internet connection. Check your network and try again.';
   }
 
   // Timeout
   if (msg.contains('timed out') || msg.contains('timeout')) {
-    return 'Request timed out. Please check your connection and try again.';
+    return 'Request timed out. Try again — it may work on the next attempt.';
   }
 
   // Supabase / server errors
   if (msg.contains('500') || msg.contains('internal server error')) {
-    return 'Something went wrong on our end. Please try again in a moment.';
+    return 'Server error — please try again in a moment.';
+  }
+
+  // 502 / 503 (edge function cold start or overload)
+  if (msg.contains('502') || msg.contains('503') || msg.contains('bad gateway') || msg.contains('service unavailable')) {
+    return 'Server is momentarily busy — please try again.';
   }
 
   // Rate limit (already has a friendly message from the Edge Function)
-  if (msg.contains('scan_limit_reached') || msg.contains('429')) {
-    // Pass through — the Edge Function returns a readable message
+  if (msg.contains('scan_limit_reached') || msg.contains('chat_limit_reached') || msg.contains('429')) {
     final cleaned = error.toString().replaceFirst('Exception: ', '');
     return cleaned;
   }
 
+  // Auth errors
+  if (msg.contains('jwt') || msg.contains('token') || msg.contains('unauthorized') || msg.contains('401')) {
+    return 'Session expired. Please sign in again.';
+  }
+
+  // AI overloaded
+  if (msg.contains('overloaded') || msg.contains('529')) {
+    return 'AI is busy right now — please try again in a few seconds.';
+  }
+
   // ClientException (generic http errors)
   if (msg.contains('clientexception')) {
-    return 'Connection error. Please check your internet and try again.';
+    return 'Connection error. Check your internet and try again.';
   }
 
   // Fallback: strip "Exception: " prefix and return
