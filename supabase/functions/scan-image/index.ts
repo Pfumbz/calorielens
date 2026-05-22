@@ -43,18 +43,20 @@ serve(async (req) => {
     const isPremium = profile?.is_premium ?? false
     const isAnonymous = user.is_anonymous ?? false
 
-    // Atomically check + increment scan count (prevents race conditions)
+    // Check scan count WITHOUT incrementing (increment only after success)
     const today = new Date().toISOString().split('T')[0]
     const scanLimit = isPremium ? PRO_SCAN_LIMIT : isAnonymous ? GUEST_SCAN_LIMIT : FREE_SCAN_LIMIT
 
-    const { data: newCount, error: rpcError } = await supabase.rpc(
-      'increment_scan_if_allowed',
-      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
-    )
+    // Read current usage
+    const { data: usage } = await supabase
+      .from('usage')
+      .select('scan_count')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle()
 
-    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
-
-    if (newCount === -1) {
+    const currentScans = usage?.scan_count ?? 0
+    if (currentScans >= scanLimit) {
       const message = isPremium
         ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
         : isAnonymous
@@ -142,7 +144,12 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
 
-    // Usage already incremented atomically above — just return the result
+    // Increment scan count AFTER successful AI response (so failed calls don't count)
+    await supabase.rpc(
+      'increment_scan_if_allowed',
+      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+    )
+
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

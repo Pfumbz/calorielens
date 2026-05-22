@@ -46,15 +46,16 @@ serve(async (req) => {
 
     // Corrections (re-analysis after "Correct" button) are free — skip the counter
     if (!is_correction) {
-      // Atomically check + increment scan count (prevents race conditions)
-      const { data: newCount, error: rpcError } = await supabase.rpc(
-        'increment_scan_if_allowed',
-        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
-      )
+      // Check scan count WITHOUT incrementing (increment only after success)
+      const { data: usage } = await supabase
+        .from('usage')
+        .select('scan_count')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .maybeSingle()
 
-      if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
-
-      if (newCount === -1) {
+      const currentScans = usage?.scan_count ?? 0
+      if (currentScans >= scanLimit) {
         const message = isPremium
           ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
           : isAnonymous
@@ -103,7 +104,14 @@ Respond ONLY in this exact JSON (no markdown):
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
 
-    // Usage already incremented atomically above — just return the result
+    // Increment scan count AFTER successful AI response (so failed calls don't count)
+    if (!is_correction) {
+      await supabase.rpc(
+        'increment_scan_if_allowed',
+        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+      )
+    }
+
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

@@ -558,6 +558,20 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Refresh usage counters from the server (called after scan errors to re-sync).
+  Future<void> refreshUsage() async {
+    try {
+      final usage = await SupabaseService.fetchTodayUsage();
+      _backendScansToday = usage.scans;
+      _backendChatsToday = usage.chats;
+      unawaited(_storage.setCachedCloudScans(usage.scans));
+      unawaited(_storage.setCachedCloudChats(usage.chats));
+      notifyListeners();
+    } catch (_) {
+      // Silently fail — offline or server unreachable
+    }
+  }
+
   /// Force refresh health data (called from UI pull-to-refresh, etc.)
   Future<void> refreshHealth() async {
     if (_healthEnabled) {

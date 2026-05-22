@@ -149,7 +149,7 @@ class _ScanScreenState extends State<ScanScreen>
   // ── Analysis ──────────────────────────────────────────────────────────
   Future<void> _analyse() async {
     final state = context.read<AppState>();
-    if (!state.canScan && !state.isPremium) {
+    if (!state.canScan) {
       showUpgradeModal(context, source: 'scan_limit');
       return;
     }
@@ -177,6 +177,10 @@ class _ScanScreenState extends State<ScanScreen>
     } catch (e) {
       setState(
           () => _error = friendlyError(e));
+      // Refresh usage from server so UI counter stays accurate after errors
+      if (state.isSignedIn) {
+        state.refreshUsage();
+      }
     } finally {
       setState(() => _loading = false);
     }
