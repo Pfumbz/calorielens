@@ -32,7 +32,7 @@ const html = `<!DOCTYPE html>
   <div class="container">
     <h1>Privacy Policy</h1>
     <p style="font-size: 20px; color: #F5EDE0;">Calorie<span class="brand">Lens</span></p>
-    <p class="updated">Last updated: 20 May 2026</p>
+    <p class="updated">Last updated: 21 May 2026</p>
 
     <p>CalorieLens (&ldquo;the App&rdquo;) is developed and operated by PC Mac Studios (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;). This Privacy Policy explains what information we collect, how we use it, and your choices regarding your data.</p>
 
@@ -44,6 +44,7 @@ const html = `<!DOCTYPE html>
       <li><strong>Diary entries:</strong> Meals you log (food names, calorie and macro estimates, timestamps) are stored to track your daily nutrition.</li>
       <li><strong>Scan data:</strong> When you scan a meal using the camera, the image is sent to our AI service (Anthropic Claude) for nutritional analysis. We do not permanently store the images &mdash; they are processed in real time and discarded.</li>
       <li><strong>Voice input:</strong> You may optionally use your device&rsquo;s microphone to describe meals by voice. Speech is processed entirely on your device using Android&rsquo;s built-in speech recogniser. CalorieLens receives only the transcribed text &mdash; no audio is recorded, stored, or transmitted by the App.</li>
+      <li><strong>Health and fitness data:</strong> You may optionally connect CalorieLens to Android Health Connect to read your daily step count and active calories burned from your fitness watch or phone sensors. This data is read locally from Health Connect on your device and is used solely to display your activity and optionally adjust your calorie goal. <strong>We do not transmit, upload, or store your health data on any server.</strong> All health data stays on your device. You can disconnect Health Connect at any time in the App&rsquo;s Settings, and no health data is retained after disconnection.</li>
       <li><strong>Usage data:</strong> We track your daily scan and chat counts to manage service limits. No browsing history, location data, or device identifiers are collected.</li>
     </ul>
 
@@ -51,7 +52,7 @@ const html = `<!DOCTYPE html>
     <p>Your information is used solely to:</p>
     <ul>
       <li>Provide and improve the App&rsquo;s nutrition tracking and AI coaching features</li>
-      <li>Calculate personalised calorie goals based on your profile</li>
+      <li>Calculate personalised calorie goals based on your profile and, if enabled, your daily activity level from Health Connect</li>
       <li>Sync your data across devices when signed in</li>
       <li>Enforce daily usage limits for free and Pro tiers</li>
       <li>Display relevant advertisements to free-tier users (via Google AdMob)</li>
@@ -70,6 +71,7 @@ const html = `<!DOCTYPE html>
       <li><strong>Google Sign-In</strong> (optional authentication method): <a href="https://policies.google.com/privacy">policies.google.com/privacy</a></li>
       <li><strong>Pexels</strong> (meal plan images): <a href="https://www.pexels.com/privacy-policy/">pexels.com/privacy-policy</a></li>
       <li><strong>Open Food Facts</strong> (barcode nutrition lookup): <a href="https://world.openfoodfacts.org/privacy">openfoodfacts.org/privacy</a></li>
+      <li><strong>Android Health Connect</strong> (optional fitness data): <a href="https://developer.android.com/health-and-fitness/guides/health-connect/develop/get-started">developer.android.com/health-connect</a>. CalorieLens reads step count and active calories burned from Health Connect on your device. <strong>No health data is transmitted to our servers.</strong> All processing occurs locally on your device.</li>
     </ul>
 
     <h2>5. Advertisements</h2>
