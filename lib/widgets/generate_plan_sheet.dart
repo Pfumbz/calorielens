@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/meal_plan.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
+import '../utils/pricing.dart';
 import '../widgets/upgrade_modal.dart';
 import '../screens/plan_detail_screen.dart';
 
@@ -62,15 +62,11 @@ class _GeneratePlanSheetState extends State<GeneratePlanSheet> {
         if (profile.sex.isNotEmpty) 'Sex: ${profile.sex == "m" ? "Male" : "Female"}',
       ];
 
-      // Add country/locale context
-      try {
-        final locale = Platform.localeName;
-        if (locale.contains('ZA') || locale.contains('za')) {
-          profileParts.add('Country: South Africa');
-        } else if (locale.length >= 2) {
-          profileParts.add('Locale: $locale');
-        }
-      } catch (_) {}
+      // Add country/locale context for locale-aware meal plans
+      final pricing = getLocalPricing();
+      final countryCode = pricing.countryCode;
+      profileParts.add('Country code: $countryCode');
+      profileParts.add('Currency: ${pricing.currency} (${pricing.symbol})');
 
       // Add recent eating history (last 3 days of meals)
       final storage = StorageService();
@@ -123,7 +119,7 @@ class _GeneratePlanSheetState extends State<GeneratePlanSheet> {
         return Ingredient(
           name: ij['name'] ?? '',
           quantity: ij['quantity'] ?? '',
-          estimatedPriceZAR: (ij['estimated_price_zar'] as num?)?.toDouble() ?? 0,
+          estimatedPrice: (ij['estimated_price'] as num?)?.toDouble() ?? 0,
           category: ij['category'] ?? 'pantry',
         );
       }).toList();
@@ -148,7 +144,7 @@ class _GeneratePlanSheetState extends State<GeneratePlanSheet> {
       description: json['description'] ?? 'AI-generated meal plan tailored to your goals.',
       category: json['category'] ?? 'balanced',
       budgetTier: json['budget_tier'] ?? 'r100',
-      estimatedCostZAR: (json['estimated_cost_zar'] as num?)?.toDouble() ?? 0,
+      estimatedCost: (json['estimated_cost'] as num?)?.toDouble() ?? 0,
       totalCalories: (json['total_calories'] as num?)?.toInt() ?? 0,
       totalProtein: (json['total_protein'] as num?)?.toInt() ?? 0,
       totalCarbs: (json['total_carbs'] as num?)?.toInt() ?? 0,

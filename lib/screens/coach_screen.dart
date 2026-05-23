@@ -1020,26 +1020,66 @@ class _CoachScreenState extends State<CoachScreen> {
               ),
             ),
           if (_proInsight != null && !_insightLoading)
-            GestureDetector(
-              onTap: _generateInsight,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: CLColors.surface2,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_proInsight!,
-                        style: const TextStyle(
-                            color: CLColors.text, fontSize: 13, height: 1.5)),
-                    const SizedBox(height: 8),
-                    const Text('Tap to refresh',
-                        style: TextStyle(color: CLColors.muted2, fontSize: 10)),
-                  ],
-                ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: CLColors.surface2,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Render markdown (bold, italic) properly
+                  _RichChatContent(text: _proInsight!),
+                  const SizedBox(height: 10),
+                  // Action row: refresh and dismiss
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _generateInsight,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: CLColors.accent.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: CLColors.accent.withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.refresh, size: 12, color: CLColors.accent),
+                              SizedBox(width: 4),
+                              Text('Refresh',
+                                  style: TextStyle(color: CLColors.accent, fontSize: 10, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => setState(() => _proInsight = null),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: CLColors.surface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: CLColors.border),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.close, size: 12, color: CLColors.muted),
+                              SizedBox(width: 4),
+                              Text('Dismiss',
+                                  style: TextStyle(color: CLColors.muted, fontSize: 10, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
         ],
@@ -1299,8 +1339,8 @@ class _CoachScreenState extends State<CoachScreen> {
   // ── 4. Smart Prompts (Pro) ────────────────────────────────────────────
   Widget _buildProPrompts() {
     const prompts = [
+      ('How am I doing today?', Icons.trending_up_outlined),
       ('Fix my protein today', Icons.fitness_center_outlined),
-      ('Build my next meal', Icons.restaurant_outlined),
       ('Why am I not losing weight?', Icons.help_outline),
     ];
 

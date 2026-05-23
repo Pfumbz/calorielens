@@ -7,7 +7,7 @@ class MealPlan {
   final String description;
   final String category; // budget | balanced | high-protein | vegetarian | bulk-cook
   final String budgetTier; // r50 | r100 | r150
-  final double estimatedCostZAR;
+  final double estimatedCost;
   final int totalCalories;
   final int totalProtein;
   final int totalCarbs;
@@ -25,7 +25,7 @@ class MealPlan {
     required this.description,
     required this.category,
     required this.budgetTier,
-    required this.estimatedCostZAR,
+    required this.estimatedCost,
     required this.totalCalories,
     required this.totalProtein,
     required this.totalCarbs,
@@ -44,7 +44,7 @@ class MealPlan {
 
   /// Per-serving cost.
   double get costPerServing =>
-      servings > 0 ? estimatedCostZAR / servings : estimatedCostZAR;
+      servings > 0 ? estimatedCost / servings : estimatedCost;
 }
 
 class PlanMeal {
@@ -73,19 +73,19 @@ class PlanMeal {
   });
 
   double get ingredientsCost =>
-      ingredients.fold(0.0, (sum, i) => sum + i.estimatedPriceZAR);
+      ingredients.fold(0.0, (sum, i) => sum + i.estimatedPrice);
 }
 
 class Ingredient {
   final String name;
   final String quantity;
-  final double estimatedPriceZAR;
+  final double estimatedPrice;
   final String category; // protein | produce | grain | dairy | pantry | spice
 
   const Ingredient({
     required this.name,
     required this.quantity,
-    required this.estimatedPriceZAR,
+    required this.estimatedPrice,
     required this.category,
   });
 }

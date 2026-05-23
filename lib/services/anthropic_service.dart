@@ -114,11 +114,38 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
     String? dietaryPreference,
     String? profileContext,
   }) async {
+    // Detect country/currency from profileContext
+    final countryMatch = RegExp(r'Country code:\s*(\w+)', caseSensitive: false)
+        .firstMatch(profileContext ?? '');
+    final countryCode = countryMatch?.group(1)?.toUpperCase() ?? 'US';
+    final currencyMatch = RegExp(r'Currency:\s*(\w+)\s*\(([^)]+)\)', caseSensitive: false)
+        .firstMatch(profileContext ?? '');
+    final currency = currencyMatch?.group(1) ?? 'USD';
+    final currencySymbol = currencyMatch?.group(2) ?? '\$';
+
+    // Locale-aware context
+    final countryContextMap = <String, Map<String, String>>{
+      'ZA': {'name': 'South Africa', 'foods': 'South African foods (pap, chakalaka, boerewors, biltong, butternut, spinach, braai chicken, samp and beans, etc.)', 'stores': 'Shoprite, Checkers, Pick n Pay, Woolworths', 'low': '50', 'mid': '100', 'high': '150'},
+      'NG': {'name': 'Nigeria', 'foods': 'Nigerian foods (jollof rice, plantain, beans, yam, egusi soup, pepper soup, suya, moi moi, etc.)', 'stores': 'Shoprite, local markets, Spar', 'low': '3000', 'mid': '5000', 'high': '8000'},
+      'KE': {'name': 'Kenya', 'foods': 'Kenyan foods (ugali, sukuma wiki, nyama choma, githeri, chapati, tilapia, pilau, etc.)', 'stores': 'Naivas, Carrefour, local markets', 'low': '500', 'mid': '800', 'high': '1200'},
+      'GH': {'name': 'Ghana', 'foods': 'Ghanaian foods (fufu, banku, groundnut soup, jollof rice, waakye, kelewele, etc.)', 'stores': 'Shoprite, Melcom, local markets', 'low': '50', 'mid': '80', 'high': '120'},
+      'GB': {'name': 'United Kingdom', 'foods': 'UK foods and ingredients from British supermarkets', 'stores': 'Tesco, Sainsbury\'s, Aldi, Asda', 'low': '5', 'mid': '10', 'high': '15'},
+      'US': {'name': 'United States', 'foods': 'American foods and common supermarket ingredients', 'stores': 'Walmart, Trader Joe\'s, Kroger, Whole Foods', 'low': '8', 'mid': '15', 'high': '25'},
+      'IN': {'name': 'India', 'foods': 'Indian foods (dal, roti, paneer, biryani, idli, dosa, sabzi, curd rice, etc.)', 'stores': 'DMart, Big Bazaar, local markets', 'low': '200', 'mid': '400', 'high': '600'},
+      'BR': {'name': 'Brazil', 'foods': 'Brazilian foods (arroz e feijão, frango, mandioca, farofa, açaí, coxinha, etc.)', 'stores': 'Pão de Açúcar, Carrefour, local markets', 'low': '30', 'mid': '50', 'high': '80'},
+      'AU': {'name': 'Australia', 'foods': 'Australian foods and supermarket ingredients', 'stores': 'Coles, Woolworths, Aldi', 'low': '10', 'mid': '20', 'high': '30'},
+      'DE': {'name': 'Germany', 'foods': 'German foods and common European ingredients', 'stores': 'Aldi, Lidl, Edeka, REWE', 'low': '5', 'mid': '10', 'high': '15'},
+      'MX': {'name': 'Mexico', 'foods': 'Mexican foods (frijoles, tortillas, pollo, arroz, aguacate, nopales, chilaquiles, etc.)', 'stores': 'Walmart, Soriana, Bodega Aurrera', 'low': '100', 'mid': '200', 'high': '350'},
+      'AE': {'name': 'UAE', 'foods': 'Middle Eastern foods (hummus, shawarma, falafel, rice, lamb, lentils, fattoush, etc.)', 'stores': 'Carrefour, Lulu, Spinneys', 'low': '25', 'mid': '50', 'high': '80'},
+    };
+
+    final ctx = countryContextMap[countryCode] ?? {'name': 'the user\'s country', 'foods': 'locally available foods and ingredients', 'stores': 'local supermarkets', 'low': '8', 'mid': '15', 'high': '25'};
+
     final budgetLabel = budgetTier == 'r50'
-        ? 'under R50 (budget, use Shoprite/Checkers ingredients)'
+        ? 'under $currencySymbol${ctx['low']} (budget, use ${ctx['stores']} ingredients)'
         : budgetTier == 'r100'
-            ? 'around R100 (mid-range, use Pick n Pay/Checkers ingredients)'
-            : 'up to R150 (premium, use quality store-bought ingredients)';
+            ? 'around $currencySymbol${ctx['mid']} (mid-range, use ${ctx['stores']} ingredients)'
+            : 'up to $currencySymbol${ctx['high']} (premium, use quality store-bought ingredients)';
 
     final dietNote = dietaryPreference != null && dietaryPreference.isNotEmpty
         ? '\nDietary preference: $dietaryPreference.'
@@ -128,17 +155,17 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
         ? '\nUser context: $profileContext'
         : '';
 
-    final prompt = '''You are a South African nutritionist and meal planner. Create a personalised one-day meal plan.
+    final prompt = '''You are a nutritionist and meal planner based in ${ctx['name']}. Create a personalised one-day meal plan.
 
 Requirements:
 - Target: $calorieGoal kcal for the day
-- Budget: $budgetLabel per day (prices in South African Rand)$dietNote$profileNote
+- Budget: $budgetLabel per day (prices in $currency)$dietNote$profileNote
 - Include 4 meals: breakfast, lunch, dinner, snack
-- Use South African foods, brands, and ingredients available at local supermarkets
-- Include realistic ZAR prices for each ingredient (2025/2026 prices)
+- Use ${ctx['foods']} available at ${ctx['stores']}
+- Include realistic $currency prices for each ingredient (2025/2026 prices)
 
 Respond ONLY in this exact JSON (no markdown, no explanation):
-{"plan_name":"<creative name>","description":"<1-2 sentences>","category":"<budget|balanced|high-protein|vegetarian|bulk-cook>","budget_tier":"$budgetTier","estimated_cost_zar":<total number>,"total_calories":<int>,"total_protein":<int>,"total_carbs":<int>,"total_fat":<int>,"prep_time_min":<int>,"emoji":"<single emoji>","meals":[{"name":"<meal name>","meal_type":"<breakfast|lunch|dinner|snack>","calories":<int>,"protein":<int>,"carbs":<int>,"fat":<int>,"emoji":"<single emoji>","recipe":"<brief instructions>","ingredients":[{"name":"<ingredient>","quantity":"<amount>","estimated_price_zar":<number>,"category":"<protein|produce|grain|dairy|spice|pantry>"}]}]}''';
+{"plan_name":"<creative name>","description":"<1-2 sentences>","category":"<budget|balanced|high-protein|vegetarian|bulk-cook>","budget_tier":"$budgetTier","estimated_cost":<total number>,"total_calories":<int>,"total_protein":<int>,"total_carbs":<int>,"total_fat":<int>,"prep_time_min":<int>,"emoji":"<single emoji>","meals":[{"name":"<meal name>","meal_type":"<breakfast|lunch|dinner|snack>","calories":<int>,"protein":<int>,"carbs":<int>,"fat":<int>,"emoji":"<single emoji>","recipe":"<brief instructions>","ingredients":[{"name":"<ingredient>","quantity":"<amount>","estimated_price":<number>,"category":"<protein|produce|grain|dairy|spice|pantry>"}]}]}''';
 
     final body = jsonEncode({
       'model': _modelFast,

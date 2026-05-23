@@ -47,6 +47,7 @@ class _ScanScreenState extends State<ScanScreen>
   String? _scannedBarcode;
   BarcodeResult? _barcodeResult;
   bool _showServingPicker = false; // true = barcode found, awaiting serving size choice
+  bool _pendingAiScanTrack = false; // true = AI was used for barcode, track on log
 
   // Voice input state
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -200,7 +201,15 @@ class _ScanScreenState extends State<ScanScreen>
       fat: r.fatG,
       fiber: r.fiberG,
     );
-    await context.read<AppState>().addEntry(entry);
+    final state = context.read<AppState>();
+    await state.addEntry(entry);
+
+    // Track scan if AI was used for barcode fallback (deferred from _aiEstimateFromBarcode)
+    if (_pendingAiScanTrack) {
+      await state.trackScan();
+      _pendingAiScanTrack = false;
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -220,6 +229,7 @@ class _ScanScreenState extends State<ScanScreen>
         _scannedBarcode = null;
         _barcodeResult = null;
         _showServingPicker = false;
+        _pendingAiScanTrack = false;
       });
       _resultAnim.reset();
     }
@@ -231,6 +241,13 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   void _discardResult() {
+    // If user discards an AI barcode result without logging, sync the counter
+    // with the server (the Edge Function already counted it)
+    if (_pendingAiScanTrack) {
+      final state = Provider.of<AppState>(context, listen: false);
+      state.trackScan();
+      _pendingAiScanTrack = false;
+    }
     setState(() {
       _result = null;
       _imageBytes = null;
@@ -824,7 +841,15 @@ class _ScanScreenState extends State<ScanScreen>
         setState(() { _barcodeResult = result; _showServingPicker = true; _loading = false; _updateResultFlag(); });
       } else if (result != null && result.productName.isNotEmpty) {
         setState(() { _barcodeResult = result; _loading = false; _updateResultFlag(); });
-        _aiEstimateFromBarcode(result.displayName);
+        // Include package/serving size so AI can estimate more accurately
+        String description = result.displayName;
+        if (result.packageSize != null) {
+          description += ' (${result.packageSize}g package)';
+        }
+        if (result.servingSize != null) {
+          description += ', serving size: ${result.servingSize}';
+        }
+        _aiEstimateFromBarcode(description);
       } else {
         setState(() { _barcodeResult = result; _loading = false; _updateResultFlag(); });
       }
@@ -840,12 +865,19 @@ class _ScanScreenState extends State<ScanScreen>
       final state = Provider.of<AppState>(context, listen: false);
       final result = await state.backend.scanText(productDescription);
       if (!mounted) return;
-      setState(() { _result = result; _loading = false; _updateResultFlag(); });
+      // Don't track scan yet — wait until the user taps LOG MEAL
+      // The server-side counter was already incremented by the Edge Function,
+      // but we defer the local UI update so the pill count doesn't drop prematurely.
+      setState(() { _result = result; _loading = false; _pendingAiScanTrack = true; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
-      await state.trackScan();
     } catch (e) {
       if (!mounted) return;
       setState(() { _loading = false; _error = friendlyError(e); });
+      // Refresh usage from server so UI counter stays accurate after errors
+      final state = Provider.of<AppState>(context, listen: false);
+      if (state.isSignedIn) {
+        state.refreshUsage();
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import '../app_state.dart';
 import '../data/meal_plans.dart';
 import '../models/meal_plan.dart';
 import '../theme.dart';
+import '../utils/pricing.dart';
 import '../widgets/upgrade_modal.dart';
 import 'plan_detail_screen.dart';
 
@@ -560,7 +561,7 @@ class _SuggestionCard extends StatelessWidget {
                           fontWeight: FontWeight.w600)),
                   const SizedBox(height: 3),
                   Text(
-                    'R${plan.estimatedCostZAR.toStringAsFixed(0)} · ${plan.totalCalories} kcal',
+                    '${getLocalPricing().symbol}${plan.estimatedCost.toStringAsFixed(0)} · ${plan.totalCalories} kcal',
                     style: const TextStyle(
                         color: CLColors.muted, fontSize: 11),
                   ),

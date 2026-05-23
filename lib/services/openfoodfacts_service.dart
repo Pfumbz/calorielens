@@ -59,11 +59,18 @@ class OpenFoodFactsService {
       final servingSize = product['serving_size'] as String?;
 
       // Try to extract per-serving values first, fall back to per-100g
-      final calories = _nutriment(nutriments, 'energy-kcal');
-      final protein = _nutriment(nutriments, 'proteins');
-      final carbs = _nutriment(nutriments, 'carbohydrates');
-      final fat = _nutriment(nutriments, 'fat');
-      final fiber = _nutriment(nutriments, 'fiber');
+      // When using per-100g, scale to actual serving/package size
+      final servingGrams = _parseGrams(servingSize);
+      final packageGrams = _parseGrams(
+          (product['product_quantity'] as dynamic)?.toString());
+      // Use serving size for scaling; if unavailable, use package size (single-serve products)
+      final scaleGrams = servingGrams ?? packageGrams;
+
+      final calories = _nutriment(nutriments, 'energy-kcal', scaleGrams: scaleGrams);
+      final protein = _nutriment(nutriments, 'proteins', scaleGrams: scaleGrams);
+      final carbs = _nutriment(nutriments, 'carbohydrates', scaleGrams: scaleGrams);
+      final fat = _nutriment(nutriments, 'fat', scaleGrams: scaleGrams);
+      final fiber = _nutriment(nutriments, 'fiber', scaleGrams: scaleGrams);
 
       ScanResult? nutrition;
       if (calories != null) {
@@ -108,13 +115,31 @@ class OpenFoodFactsService {
   }
 
   /// Extracts a nutriment value, preferring per-serving over per-100g.
-  static int? _nutriment(Map<String, dynamic> n, String key) {
-    // Try per-serving first
+  /// When using per-100g fallback, scales to [scaleGrams] if provided.
+  static int? _nutriment(Map<String, dynamic> n, String key, {double? scaleGrams}) {
+    // Try per-serving first (already scaled to one serving)
     final serving = n['${key}_serving'];
     if (serving != null) return (serving as num).round();
-    // Fall back to per-100g
+    // Fall back to per-100g, scaled to actual serving/package size
     final per100 = n['${key}_100g'];
-    if (per100 != null) return (per100 as num).round();
+    if (per100 != null) {
+      if (scaleGrams != null && scaleGrams > 0) {
+        return ((per100 as num) * scaleGrams / 100).round();
+      }
+      return (per100 as num).round(); // no size info — assume 100g
+    }
     return null;
+  }
+
+  /// Parses a weight string like "60g", "500ml", "1.5kg" into grams.
+  static double? _parseGrams(String? s) {
+    if (s == null || s.isEmpty) return null;
+    final match = RegExp(r'([\d.]+)\s*(kg|g|l|ml)?', caseSensitive: false).firstMatch(s);
+    if (match == null) return null;
+    final num = double.tryParse(match.group(1)!);
+    if (num == null) return null;
+    final unit = (match.group(2) ?? 'g').toLowerCase();
+    if (unit == 'kg' || unit == 'l') return num * 1000;
+    return num; // g or ml
   }
 }

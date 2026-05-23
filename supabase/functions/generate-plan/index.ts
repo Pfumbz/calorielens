@@ -70,12 +70,36 @@ serve(async (req) => {
       })
     }
 
-    // Build the prompt (same as AnthropicService.generateMealPlan)
+    // Detect country from profileContext (e.g. "Country code: ZA")
+    const countryMatch = profileContext?.match(/Country code:\s*(\w+)/i)
+    const countryCode = countryMatch?.[1]?.toUpperCase() ?? 'US'
+    const currencyMatch = profileContext?.match(/Currency:\s*(\w+)\s*\(([^)]+)\)/i)
+    const currency = currencyMatch?.[1] ?? 'USD'
+    const currencySymbol = currencyMatch?.[2] ?? '$'
+
+    // Locale-aware context
+    const countryContext: Record<string, { name: string, foods: string, stores: string, budgetLow: string, budgetMid: string, budgetHigh: string }> = {
+      'ZA': { name: 'South Africa', foods: 'South African foods (pap, chakalaka, boerewors, biltong, butternut, spinach, braai chicken, samp and beans, etc.)', stores: 'Shoprite, Checkers, Pick n Pay, Woolworths', budgetLow: '50', budgetMid: '100', budgetHigh: '150' },
+      'NG': { name: 'Nigeria', foods: 'Nigerian foods (jollof rice, plantain, beans, yam, egusi soup, pepper soup, suya, moi moi, etc.)', stores: 'Shoprite, local markets, Spar', budgetLow: '3000', budgetMid: '5000', budgetHigh: '8000' },
+      'KE': { name: 'Kenya', foods: 'Kenyan foods (ugali, sukuma wiki, nyama choma, githeri, chapati, tilapia, pilau, etc.)', stores: 'Naivas, Carrefour, local markets', budgetLow: '500', budgetMid: '800', budgetHigh: '1200' },
+      'GH': { name: 'Ghana', foods: 'Ghanaian foods (fufu, banku, groundnut soup, jollof rice, waakye, kelewele, etc.)', stores: 'Shoprite, Melcom, local markets', budgetLow: '50', budgetMid: '80', budgetHigh: '120' },
+      'GB': { name: 'United Kingdom', foods: 'UK foods and ingredients from British supermarkets', stores: 'Tesco, Sainsbury\'s, Aldi, Asda', budgetLow: '5', budgetMid: '10', budgetHigh: '15' },
+      'US': { name: 'United States', foods: 'American foods and common supermarket ingredients', stores: 'Walmart, Trader Joe\'s, Kroger, Whole Foods', budgetLow: '8', budgetMid: '15', budgetHigh: '25' },
+      'IN': { name: 'India', foods: 'Indian foods (dal, roti, paneer, biryani, idli, dosa, sabzi, curd rice, etc.)', stores: 'DMart, Big Bazaar, local markets', budgetLow: '200', budgetMid: '400', budgetHigh: '600' },
+      'BR': { name: 'Brazil', foods: 'Brazilian foods (arroz e feijão, frango, mandioca, farofa, açaí, coxinha, etc.)', stores: 'Pão de Açúcar, Carrefour, local markets', budgetLow: '30', budgetMid: '50', budgetHigh: '80' },
+      'AU': { name: 'Australia', foods: 'Australian foods and supermarket ingredients', stores: 'Coles, Woolworths, Aldi', budgetLow: '10', budgetMid: '20', budgetHigh: '30' },
+      'DE': { name: 'Germany', foods: 'German foods and common European ingredients', stores: 'Aldi, Lidl, Edeka, REWE', budgetLow: '5', budgetMid: '10', budgetHigh: '15' },
+      'MX': { name: 'Mexico', foods: 'Mexican foods (frijoles, tortillas, pollo, arroz, aguacate, nopales, chilaquiles, etc.)', stores: 'Walmart, Soriana, Bodega Aurrera', budgetLow: '100', budgetMid: '200', budgetHigh: '350' },
+      'AE': { name: 'UAE', foods: 'Middle Eastern foods (hummus, shawarma, falafel, rice, lamb, lentils, fattoush, etc.)', stores: 'Carrefour, Lulu, Spinneys', budgetLow: '25', budgetMid: '50', budgetHigh: '80' },
+    }
+
+    const ctx = countryContext[countryCode] ?? { name: 'the user\'s country', foods: 'locally available foods and ingredients', stores: 'local supermarkets', budgetLow: '8', budgetMid: '15', budgetHigh: '25' }
+
     const budgetLabel = budgetTier === 'r50'
-      ? 'under R50 (budget, use Shoprite/Checkers ingredients)'
+      ? `under ${currencySymbol}${ctx.budgetLow} (budget, use ${ctx.stores} ingredients)`
       : budgetTier === 'r100'
-        ? 'around R100 (mid-range, use Pick n Pay/Checkers ingredients)'
-        : 'up to R150 (premium, can use Woolworths ingredients)'
+        ? `around ${currencySymbol}${ctx.budgetMid} (mid-range, use ${ctx.stores} ingredients)`
+        : `up to ${currencySymbol}${ctx.budgetHigh} (premium, use quality store-bought ingredients)`
 
     const dietNote = dietaryPreference
       ? `\nDietary preference: ${dietaryPreference}.`
@@ -85,17 +109,17 @@ serve(async (req) => {
       ? `\nUser context: ${profileContext}`
       : ''
 
-    const prompt = `You are a South African nutritionist and meal planner. Create a personalised one-day meal plan.
+    const prompt = `You are a nutritionist and meal planner based in ${ctx.name}. Create a personalised one-day meal plan.
 
 Requirements:
 - Target: ${calorieGoal} kcal for the day
-- Budget: ${budgetLabel} per day (prices in South African Rand)${dietNote}${profileNote}
+- Budget: ${budgetLabel} per day (prices in ${currency})${dietNote}${profileNote}
 - Include 4 meals: breakfast, lunch, dinner, snack
-- Use South African foods, brands, and ingredients available at local supermarkets
-- Include realistic ZAR prices for each ingredient (2025/2026 prices)
+- Use ${ctx.foods} available at ${ctx.stores}
+- Include realistic ${currency} prices for each ingredient (2025/2026 prices)
 
 Respond ONLY in this exact JSON (no markdown, no explanation):
-{"plan_name":"<creative name>","description":"<1-2 sentences>","category":"<budget|balanced|high-protein|vegetarian|bulk-cook>","budget_tier":"${budgetTier}","estimated_cost_zar":<total number>,"total_calories":<int>,"total_protein":<int>,"total_carbs":<int>,"total_fat":<int>,"prep_time_min":<int>,"emoji":"<single emoji>","meals":[{"name":"<meal name>","meal_type":"<breakfast|lunch|dinner|snack>","calories":<int>,"protein":<int>,"carbs":<int>,"fat":<int>,"emoji":"<single emoji>","recipe":"<brief instructions>","ingredients":[{"name":"<ingredient>","quantity":"<amount>","estimated_price_zar":<number>,"category":"<protein|produce|grain|dairy|spice|pantry>"}]}]}`
+{"plan_name":"<creative name>","description":"<1-2 sentences>","category":"<budget|balanced|high-protein|vegetarian|bulk-cook>","budget_tier":"${budgetTier}","estimated_cost":<total number>,"total_calories":<int>,"total_protein":<int>,"total_carbs":<int>,"total_fat":<int>,"prep_time_min":<int>,"emoji":"<single emoji>","meals":[{"name":"<meal name>","meal_type":"<breakfast|lunch|dinner|snack>","calories":<int>,"protein":<int>,"carbs":<int>,"fat":<int>,"emoji":"<single emoji>","recipe":"<brief instructions>","ingredients":[{"name":"<ingredient>","quantity":"<amount>","estimated_price":<number>,"category":"<protein|produce|grain|dairy|spice|pantry>"}]}]}`
 
     // Call Anthropic
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
