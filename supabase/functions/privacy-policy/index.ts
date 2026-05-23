@@ -1,5 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -109,12 +107,12 @@ const html = `<!DOCTYPE html>
 </body>
 </html>`
 
-serve((_req) => {
+Deno.serve((_req) => {
   return new Response(html, {
     status: 200,
     headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'public, max-age=86400',
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'public, max-age=86400',
     },
   })
 })
