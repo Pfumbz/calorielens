@@ -228,6 +228,10 @@ class StorageService {
   bool get healthOnboardingDismissed => _prefs.getBool('cl6_health_onboard_dismissed') ?? false;
   Future<void> setHealthOnboardingDismissed(bool v) => _prefs.setBool('cl6_health_onboard_dismissed', v);
 
+  /// Whether the user has dismissed the profile completion nudge.
+  bool get profileNudgeDismissed => _prefs.getBool('cl6_profile_nudge_dismissed') ?? false;
+  Future<void> setProfileNudgeDismissed(bool v) => _prefs.setBool('cl6_profile_nudge_dismissed', v);
+
   // ── AI-generated meal plans (JSON strings) ───────────────────────
   List<String> get generatedPlansJson {
     return _prefs.getStringList('cl5_gen_plans') ?? [];

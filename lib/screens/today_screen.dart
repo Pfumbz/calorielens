@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../services/health_service.dart';
 import '../widgets/ad_banner.dart';
 import 'history_screen.dart';
+import 'settings_screen.dart';
 import 'week_report_screen.dart';
 
 class TodayScreen extends StatelessWidget {
@@ -43,6 +44,9 @@ class TodayScreen extends StatelessWidget {
               const SizedBox(height: 12),
               _buildCalorieRing(context, state),
               const SizedBox(height: 12),
+              // Profile completion nudge
+              if (_shouldShowProfileNudge(state))
+                const _ProfileNudgeCard(),
               _buildMacroBars(state),
               const SizedBox(height: 12),
               _buildInsightsSection(context, state, isPro),
@@ -114,6 +118,18 @@ class TodayScreen extends StatelessWidget {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROFILE NUDGE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  bool _shouldShowProfileNudge(AppState state) {
+    final p = state.profile;
+    final profileIncomplete = p.weight <= 0 || p.height <= 0 || p.age <= 0;
+    final hasLoggedEnough = state.diary.length >= 2;
+    final dismissed = StorageService().profileNudgeDismissed;
+    return profileIncomplete && hasLoggedEnough && !dismissed;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1048,6 +1064,123 @@ class TodayScreen extends StatelessWidget {
                   Navigator.pop(context);
                 },
                 child: const Text('ADD MEAL'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Profile completion nudge card
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _ProfileNudgeCard extends StatefulWidget {
+  const _ProfileNudgeCard();
+
+  @override
+  State<_ProfileNudgeCard> createState() => _ProfileNudgeCardState();
+}
+
+class _ProfileNudgeCardState extends State<_ProfileNudgeCard> {
+  bool _dismissed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CLColors.accent.withOpacity(0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: CLColors.accent.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.person_outline,
+                      color: CLColors.accent.withOpacity(0.8), size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Personalise your calorie goal',
+                    style: TextStyle(
+                      color: CLColors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    await StorageService().setProfileNudgeDismissed(true);
+                    setState(() => _dismissed = true);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(Icons.close,
+                        color: CLColors.muted.withOpacity(0.5), size: 16),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Add your age, height, and weight so we can calculate a more accurate daily target and give you better coaching advice.',
+              style: TextStyle(
+                color: CLColors.muted,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: CLColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: CLColors.accent.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit_outlined,
+                          color: CLColors.accent, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Complete Profile',
+                        style: TextStyle(
+                          color: CLColors.accent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
