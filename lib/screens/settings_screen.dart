@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../services/auth_service.dart';
 import '../services/health_service.dart';
 import '../services/notification_service.dart';
+import '../services/storage_service.dart';
 import '../theme.dart';
 import '../utils/pricing.dart';
 import '../widgets/profile_sheet.dart';
@@ -25,6 +26,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   TimeOfDay _breakfastTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _lunchTime = const TimeOfDay(hour: 12, minute: 30);
   TimeOfDay _dinnerTime = const TimeOfDay(hour: 18, minute: 30);
+
+  // Collapsible section state
+  bool _expandedSubscription = false;
+  bool _expandedHealth = false;
+  bool _expandedPreferences = false;
 
   @override
   void initState() {
@@ -321,11 +327,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Header row: crown + title + badge
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: GestureDetector(
-              onTap: isPro ? null : () => showUpgradeModal(context, source: 'settings'),
+          // Header row: crown + title + badge (tap to expand)
+          GestureDetector(
+            onTap: () => setState(() => _expandedSubscription = !_expandedSubscription),
+            child: Container(
+              color: Colors.transparent,
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   Container(
@@ -388,78 +395,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right,
-                      color: CLColors.muted, size: 18),
+                  AnimatedRotation(
+                    turns: _expandedSubscription ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.chevron_right,
+                        color: CLColors.muted, size: 18),
+                  ),
                 ],
               ),
             ),
           ),
 
-          // Feature details — detailed for Pro, icon row for Free
-          if (isPro)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Column(
-                children: [
-                  _proFeatureRow(Icons.camera_alt_outlined, '${AppState.proScanLimit} AI scans per day',
-                    '${state.scansRemainingToday} remaining today'),
-                  _proFeatureRow(Icons.bar_chart, 'Weekly progress reports',
-                    'Detailed nutrition scoring'),
-                  _proFeatureRow(Icons.psychology, 'Smart Coach with meal history',
-                    'Uses your 7-day patterns'),
-                  _proFeatureRow(Icons.restaurant_menu, 'Personalised meal plans',
-                    'AI recommendations & fridge scanner'),
-                  _proFeatureRow(Icons.block, 'Ad-free experience',
-                    'No interruptions'),
-                ],
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-              child: Row(
-                children: [
-                  _featureIcon(Icons.camera_alt_outlined, '${AppState.freeScanLimit} scans\nper day', false),
-                  _featureIcon(Icons.restaurant_menu, 'Basic\nlogging', false),
-                  _featureIcon(Icons.chat_outlined, 'Limited\ncoach', false),
-                  _featureIcon(Icons.history, '7 day\nhistory', false),
-                  _featureIcon(Icons.auto_awesome, 'Upgrade\nfor more', false),
-                ],
-              ),
-            ),
-
-          // Manage subscription / Upgrade row
-          const Divider(color: CLColors.border, height: 1),
-          _tappableRow(
-            icon: null,
-            label: isPro ? 'Manage subscription' : 'Upgrade to Pro — ${getLocalPricing().fullPrice}',
-            labelColor: CLColors.accent,
-            onTap: isPro
-                ? () => _handleManageSubscription()
-                : () => showUpgradeModal(context, source: 'settings'),
-          ),
-          // Restore purchases option (always visible for signed-in users)
-          if (!isPro && state.isSignedIn) ...[
-            const Divider(color: CLColors.border, height: 1),
-            _tappableRow(
-              icon: null,
-              label: 'Restore purchases',
-              labelColor: CLColors.muted,
-              onTap: () async {
-                await context.read<AppState>().restorePurchases();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Checking for previous purchases...'),
-                      backgroundColor: CLColors.surface,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Expandable details
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 250),
+            crossFadeState: _expandedSubscription
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Column(
+              children: [
+                const Divider(color: CLColors.border, height: 1),
+                // Feature details
+                if (isPro)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: Column(
+                      children: [
+                        _proFeatureRow(Icons.camera_alt_outlined, '${AppState.proScanLimit} AI scans per day',
+                          '${state.scansRemainingToday} remaining today'),
+                        _proFeatureRow(Icons.bar_chart, 'Weekly progress reports',
+                          'Detailed nutrition scoring'),
+                        _proFeatureRow(Icons.psychology, 'Smart Coach with meal history',
+                          'Uses your 7-day patterns'),
+                        _proFeatureRow(Icons.restaurant_menu, 'Personalised meal plans',
+                          'AI recommendations & fridge scanner'),
+                        _proFeatureRow(Icons.block, 'Ad-free experience',
+                          'No interruptions'),
+                      ],
                     ),
-                  );
-                }
-              },
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+                    child: Row(
+                      children: [
+                        _featureIcon(Icons.camera_alt_outlined, '${AppState.freeScanLimit} scans\nper day', false),
+                        _featureIcon(Icons.restaurant_menu, 'Basic\nlogging', false),
+                        _featureIcon(Icons.chat_outlined, 'Limited\ncoach', false),
+                        _featureIcon(Icons.history, '7 day\nhistory', false),
+                        _featureIcon(Icons.auto_awesome, 'Upgrade\nfor more', false),
+                      ],
+                    ),
+                  ),
+
+                // Manage subscription / Upgrade row
+                const Divider(color: CLColors.border, height: 1),
+                _tappableRow(
+                  icon: null,
+                  label: isPro ? 'Manage subscription' : 'Upgrade to Pro — ${getLocalPricing().fullPrice}',
+                  labelColor: CLColors.accent,
+                  onTap: isPro
+                      ? () => _handleManageSubscription()
+                      : () => showUpgradeModal(context, source: 'settings'),
+                ),
+                // Restore purchases option (always visible for signed-in users)
+                if (!isPro && state.isSignedIn) ...[
+                  const Divider(color: CLColors.border, height: 1),
+                  _tappableRow(
+                    icon: null,
+                    label: 'Restore purchases',
+                    labelColor: CLColors.muted,
+                    onTap: () async {
+                      await context.read<AppState>().restorePurchases();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Checking for previous purchases...'),
+                            backgroundColor: CLColors.surface,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -529,6 +553,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ── PREFERENCES SECTION ────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildPreferencesSection() {
+    // Build status summary
+    final statusParts = <String>[];
+    if (_remindersOn) statusParts.add('Reminders on');
+    if (_nudgesOn) statusParts.add('Nudges on');
+    final statusText = statusParts.isEmpty
+        ? 'All notifications off'
+        : statusParts.join(' · ');
+
     return Container(
       decoration: BoxDecoration(
         color: CLColors.surface,
@@ -538,146 +570,206 @@ class _SettingsScreenState extends State<SettingsScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Reminders toggle
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: CLColors.accent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+          // Header row (tap to expand)
+          GestureDetector(
+            onTap: () => setState(() => _expandedPreferences = !_expandedPreferences),
+            child: Container(
+              color: Colors.transparent,
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: CLColors.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.notifications_outlined,
+                        color: CLColors.accent, size: 22),
                   ),
-                  child: const Icon(Icons.notifications_outlined,
-                      color: CLColors.accent, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Reminders',
-                          style: TextStyle(
-                              color: CLColors.text,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
-                      SizedBox(height: 1),
-                      Text('Stay on track with meal reminders',
-                          style: TextStyle(
-                              color: CLColors.muted, fontSize: 11)),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Notifications',
+                            style: TextStyle(
+                                color: CLColors.text,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(statusText,
+                            style: const TextStyle(
+                                color: CLColors.muted, fontSize: 11)),
+                      ],
+                    ),
                   ),
-                ),
-                Switch(
-                  value: _remindersOn,
-                  onChanged: (val) async {
-                    final granted =
-                        await NotificationService.requestPermission();
-                    if (!granted && val) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Please enable notifications in your device settings'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                      return;
-                    }
-                    setState(() => _remindersOn = val);
-                    await NotificationService.setRemindersEnabled(val);
-                  },
-                  activeColor: CLColors.accent,
-                  inactiveTrackColor: CLColors.border,
-                ),
-              ],
+                  AnimatedRotation(
+                    turns: _expandedPreferences ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.chevron_right,
+                        color: CLColors.muted, size: 18),
+                  ),
+                ],
+              ),
             ),
           ),
 
-          // Meal time rows (visible when reminders are on)
-          if (_remindersOn) ...[
-            const SizedBox(height: 4),
-            _mealTimeRow(Icons.wb_sunny_outlined, 'Breakfast',
-                _breakfastTime, (t) async {
-              setState(() => _breakfastTime = t);
-              await NotificationService.setReminderTime('breakfast', t);
-            }),
-            _mealTimeRow(Icons.restaurant_outlined, 'Lunch',
-                _lunchTime, (t) async {
-              setState(() => _lunchTime = t);
-              await NotificationService.setReminderTime('lunch', t);
-            }),
-            _mealTimeRow(Icons.nightlight_outlined, 'Dinner',
-                _dinnerTime, (t) async {
-              setState(() => _dinnerTime = t);
-              await NotificationService.setReminderTime('dinner', t);
-            }),
-          ],
-
-          const Divider(color: CLColors.border, height: 1),
-
-          // Coaching nudges toggle
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-            child: Row(
+          // Expandable details
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 250),
+            crossFadeState: _expandedPreferences
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Column(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: CLColors.gold.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.lightbulb_outline,
-                      color: CLColors.gold, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Coaching Nudges',
-                          style: TextStyle(
-                              color: CLColors.text,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
-                      SizedBox(height: 1),
-                      Text('Get smart tips based on your progress',
-                          style: TextStyle(
-                              color: CLColors.muted, fontSize: 11)),
+                const Divider(color: CLColors.border, height: 1),
+
+                // Reminders toggle
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: CLColors.accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.alarm,
+                            color: CLColors.accent, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('Meal Reminders',
+                                style: TextStyle(
+                                    color: CLColors.text,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600)),
+                            SizedBox(height: 1),
+                            Text('Stay on track with meal reminders',
+                                style: TextStyle(
+                                    color: CLColors.muted, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _remindersOn,
+                        onChanged: (val) async {
+                          final granted =
+                              await NotificationService.requestPermission();
+                          if (!granted && val) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Please enable notifications in your device settings'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          setState(() => _remindersOn = val);
+                          await NotificationService.setRemindersEnabled(val);
+                        },
+                        activeColor: CLColors.accent,
+                        inactiveTrackColor: CLColors.border,
+                      ),
                     ],
                   ),
                 ),
-                Switch(
-                  value: _nudgesOn,
-                  onChanged: (val) async {
-                    final granted =
-                        await NotificationService.requestPermission();
-                    if (!granted && val) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Please enable notifications in your device settings'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                      return;
-                    }
-                    setState(() => _nudgesOn = val);
-                    final state = Provider.of<AppState>(context, listen: false);
-                    await NotificationService.setNudgesEnabled(
-                      val,
-                      caloriesEaten: state.totalCalories,
-                      calorieGoal: state.calorieGoal,
-                    );
-                  },
-                  activeColor: CLColors.accent,
-                  inactiveTrackColor: CLColors.border,
+
+                // Meal time rows (visible when reminders are on)
+                if (_remindersOn) ...[
+                  const SizedBox(height: 4),
+                  _mealTimeRow(Icons.wb_sunny_outlined, 'Breakfast',
+                      _breakfastTime, (t) async {
+                    setState(() => _breakfastTime = t);
+                    await NotificationService.setReminderTime('breakfast', t);
+                  }),
+                  _mealTimeRow(Icons.restaurant_outlined, 'Lunch',
+                      _lunchTime, (t) async {
+                    setState(() => _lunchTime = t);
+                    await NotificationService.setReminderTime('lunch', t);
+                  }),
+                  _mealTimeRow(Icons.nightlight_outlined, 'Dinner',
+                      _dinnerTime, (t) async {
+                    setState(() => _dinnerTime = t);
+                    await NotificationService.setReminderTime('dinner', t);
+                  }),
+                ],
+
+                const Divider(color: CLColors.border, height: 1),
+
+                // Coaching nudges toggle
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: CLColors.gold.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.lightbulb_outline,
+                            color: CLColors.gold, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('Coaching Nudges',
+                                style: TextStyle(
+                                    color: CLColors.text,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600)),
+                            SizedBox(height: 1),
+                            Text('Get smart tips based on your progress',
+                                style: TextStyle(
+                                    color: CLColors.muted, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _nudgesOn,
+                        onChanged: (val) async {
+                          final granted =
+                              await NotificationService.requestPermission();
+                          if (!granted && val) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Please enable notifications in your device settings'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          setState(() => _nudgesOn = val);
+                          final state = Provider.of<AppState>(context, listen: false);
+                          await NotificationService.setNudgesEnabled(
+                            val,
+                            caloriesEaten: state.totalCalories,
+                            calorieGoal: state.calorieGoal,
+                          );
+                        },
+                        activeColor: CLColors.accent,
+                        inactiveTrackColor: CLColors.border,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -745,6 +837,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildHealthSection(AppState state) {
     final isEnabled = state.healthEnabled;
 
+    // Build status summary for collapsed view
+    final statusText = isEnabled
+        ? (state.stepsToday > 0
+            ? 'Connected · ${state.stepsToday} steps today'
+            : 'Connected')
+        : 'Not connected';
+
     return Container(
       decoration: BoxDecoration(
         color: CLColors.surface,
@@ -754,218 +853,290 @@ class _SettingsScreenState extends State<SettingsScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Health Connect toggle
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: CLColors.accent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.monitor_heart_outlined,
-                      color: CLColors.accent, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Health Connect',
-                          style: TextStyle(
-                              color: CLColors.text,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
-                      SizedBox(height: 1),
-                      Text('Steps & calories from your watch',
-                          style: TextStyle(
-                              color: CLColors.muted, fontSize: 11)),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: isEnabled,
-                  onChanged: (val) async {
-                    if (val) {
-                      // Check availability first
-                      final health = HealthService();
-                      final available = await health.isHealthConnectAvailable();
-                      if (!available) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                  'Health Connect is not installed. Opening Play Store…'),
-                              backgroundColor: CLColors.surface,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        }
-                        await health.installHealthConnect();
-                        return;
-                      }
-
-                      // Request permissions
-                      final granted = await health.requestPermissions();
-                      if (!granted) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                  'Permission not granted. Please allow access in Health Connect settings.'),
-                              backgroundColor: CLColors.surface,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        }
-                        return;
-                      }
-                    }
-                    await context.read<AppState>().setHealthEnabled(val);
-                  },
-                  activeColor: CLColors.accent,
-                  inactiveTrackColor: CLColors.border,
-                ),
-              ],
-            ),
-          ),
-
-          // Sub-settings (only visible when enabled)
-          if (isEnabled) ...[
-            const Divider(color: CLColors.border, height: 1),
-
-            // Auto-adjust goal toggle
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+          // Header row (tap to expand)
+          GestureDetector(
+            onTap: () => setState(() => _expandedHealth = !_expandedHealth),
+            child: Container(
+              color: Colors.transparent,
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: CLColors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      color: isEnabled
+                          ? CLColors.green.withOpacity(0.1)
+                          : CLColors.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.track_changes,
-                        color: CLColors.green, size: 18),
+                    child: Icon(Icons.monitor_heart_outlined,
+                        color: isEnabled ? CLColors.green : CLColors.accent,
+                        size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Auto-adjust calorie goal',
+                      children: [
+                        const Text('Health Connect',
                             style: TextStyle(
                                 color: CLColors.text,
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w600)),
-                        SizedBox(height: 1),
-                        Text('Add activity bonus to daily target',
-                            style: TextStyle(
+                        const SizedBox(height: 2),
+                        Text(statusText,
+                            style: const TextStyle(
                                 color: CLColors.muted, fontSize: 11)),
                       ],
                     ),
                   ),
-                  Switch(
-                    value: state.autoAdjustGoal,
-                    onChanged: (val) =>
-                        context.read<AppState>().setAutoAdjustGoal(val),
-                    activeColor: CLColors.accent,
-                    inactiveTrackColor: CLColors.border,
+                  AnimatedRotation(
+                    turns: _expandedHealth ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.chevron_right,
+                        color: CLColors.muted, size: 18),
                   ),
                 ],
               ),
             ),
+          ),
 
-            // Activity multiplier
-            if (state.autoAdjustGoal) ...[
-              const Divider(color: CLColors.border, height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: CLColors.muted.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.tune,
-                          color: CLColors.muted, size: 18),
+          // Expandable details
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 250),
+            crossFadeState: _expandedHealth
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Column(
+              children: [
+                // Connect button (when not connected)
+                if (!isEnabled) ...[
+                  const Divider(color: CLColors.border, height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Track steps and calories burned from your fitness watch or phone sensors.',
+                          style: TextStyle(color: CLColors.muted, fontSize: 12, height: 1.4),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _connectHealthConnect(),
+                            icon: const Icon(Icons.link, size: 18),
+                            label: const Text('Connect'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: CLColors.accent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('Activity multiplier',
-                              style: TextStyle(
-                                  color: CLColors.text,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600)),
-                          SizedBox(height: 1),
-                          Text('How much of burned calories to add back',
-                              style: TextStyle(
-                                  color: CLColors.muted, fontSize: 11)),
+                  ),
+                ],
+
+                // Sub-settings + disconnect (only visible when connected)
+                if (isEnabled) ...[
+                  const Divider(color: CLColors.border, height: 1),
+
+                  // Auto-adjust goal toggle
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: CLColors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.track_changes,
+                              color: CLColors.green, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text('Auto-adjust calorie goal',
+                                  style: TextStyle(
+                                      color: CLColors.text,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600)),
+                              SizedBox(height: 1),
+                              Text('Add activity bonus to daily target',
+                                  style: TextStyle(
+                                      color: CLColors.muted, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: state.autoAdjustGoal,
+                          onChanged: (val) =>
+                              context.read<AppState>().setAutoAdjustGoal(val),
+                          activeColor: CLColors.accent,
+                          inactiveTrackColor: CLColors.border,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Activity multiplier
+                  if (state.autoAdjustGoal) ...[
+                    const Divider(color: CLColors.border, height: 1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: CLColors.muted.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.tune,
+                                color: CLColors.muted, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text('Activity multiplier',
+                                    style: TextStyle(
+                                        color: CLColors.text,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600)),
+                                SizedBox(height: 1),
+                                Text('How much of burned calories to add back',
+                                    style: TextStyle(
+                                        color: CLColors.muted, fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _showMultiplierPicker(state),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: CLColors.accentLo,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${(state.activityMultiplier * 100).round()}%',
+                                style: const TextStyle(
+                                    color: CLColors.accent,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => _showMultiplierPicker(state),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: CLColors.accentLo,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${(state.activityMultiplier * 100).round()}%',
-                          style: const TextStyle(
-                              color: CLColors.accent,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700),
-                        ),
+                  ],
+
+                  // Status line
+                  if (state.stepsToday > 0) ...[
+                    const Divider(color: CLColors.border, height: 1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle,
+                              size: 14, color: CLColors.green),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${state.stepsToday} steps · ${state.activeCaloriesToday} kcal burned today',
+                            style: const TextStyle(
+                                color: CLColors.green,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-              ),
-            ],
-          ],
 
-          // Status line
-          if (isEnabled && state.stepsToday > 0) ...[
-            const Divider(color: CLColors.border, height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle,
-                      size: 14, color: CLColors.green),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${state.stepsToday} steps · ${state.activeCaloriesToday} kcal burned today',
-                    style: const TextStyle(
-                        color: CLColors.green,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500),
+                  // Disconnect option
+                  const Divider(color: CLColors.border, height: 1),
+                  GestureDetector(
+                    onTap: () async {
+                      await context.read<AppState>().setHealthEnabled(false);
+                    },
+                    child: Container(
+                      color: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: CLColors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.link_off,
+                                color: CLColors.red, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text('Disconnect',
+                              style: TextStyle(
+                                  color: CLColors.red,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
-              ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
+  }
+
+  /// Connect to Health Connect — same flow as Today tab banner.
+  Future<void> _connectHealthConnect() async {
+    final health = HealthService();
+    final granted = await health.requestPermissions();
+    if (granted) {
+      if (mounted) {
+        await context.read<AppState>().setHealthEnabled(true);
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Could not connect. Make sure Health Connect is installed and permissions are allowed.'),
+            backgroundColor: CLColors.surface,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
   }
 
   void _showMultiplierPicker(AppState state) {

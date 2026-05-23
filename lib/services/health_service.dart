@@ -9,18 +9,33 @@ class HealthService {
   factory HealthService() => _instance;
   HealthService._internal();
 
+  // Single Health instance — reused across the app (required since health v10+)
+  final _health = Health();
+  bool _configured = false;
+
   // The health data types we read
-  static const _types = [
+  // Note: TOTAL_CALORIES_BURNED is optional — requested separately so it
+  // doesn't block STEPS + ACTIVE if unsupported on older HC versions.
+  static const _coreTypes = [
     HealthDataType.STEPS,
     HealthDataType.ACTIVE_ENERGY_BURNED,
+  ];
+
+  static const _corePermissions = [
+    HealthDataAccess.READ,
+    HealthDataAccess.READ,
+  ];
+
+  static const _extraTypes = [
     HealthDataType.TOTAL_CALORIES_BURNED,
   ];
 
-  static const _permissions = [
-    HealthDataAccess.READ,
-    HealthDataAccess.READ,
+  static const _extraPermissions = [
     HealthDataAccess.READ,
   ];
+
+  // Combined list for data fetching (only includes types we got permission for)
+  List<HealthDataType> _grantedTypes = [];
 
   bool _isAuthorized = false;
   bool get isAuthorized => _isAuthorized;
@@ -32,24 +47,37 @@ class HealthService {
   int get stepsToday => _stepsToday;
   int get activeCaloriesToday => _activeCaloriesToday;
 
+  /// Ensure the Health plugin is configured before use (required since v10).
+  Future<void> _ensureConfigured() async {
+    if (!_configured) {
+      await _health.configure();
+      _configured = true;
+      debugPrint('HealthService: Health plugin configured');
+    }
+  }
+
   /// Check if Health Connect is available on this device.
   Future<bool> isHealthConnectAvailable() async {
     try {
+      await _ensureConfigured();
       if (Platform.isAndroid) {
-        final status = await Health().getHealthConnectSdkStatus();
+        final status = await _health.getHealthConnectSdkStatus();
         debugPrint('HealthService: SDK status = $status');
-        // Accept both sdkAvailable and sdkUnavailableProviderUpdateRequired
-        // (the latter means HC is present but needs an update — permissions still work)
-        return status == HealthConnectSdkStatus.sdkAvailable ||
-            status == HealthConnectSdkStatus.sdkUnavailableProviderUpdateRequired;
+        if (status == HealthConnectSdkStatus.sdkAvailable ||
+            status == HealthConnectSdkStatus.sdkUnavailableProviderUpdateRequired) {
+          return true;
+        }
+        // For any other status, still try — the SDK status check can give
+        // false negatives due to package visibility restrictions on Android 11+.
+        debugPrint('HealthService: SDK status not explicitly available ($status), '
+            'will attempt permissions anyway');
+        return true;
       }
       // iOS: HealthKit is always available on iOS devices
       if (Platform.isIOS) return true;
       return false;
     } catch (e) {
       debugPrint('HealthService: availability check failed: $e');
-      // If the check itself throws, HC might still work — return true so
-      // requestPermissions can try and give a definitive answer.
       if (Platform.isAndroid) return true;
       return false;
     }
@@ -58,24 +86,54 @@ class HealthService {
   /// Install Health Connect (Android only) — opens the Play Store listing.
   Future<void> installHealthConnect() async {
     try {
-      await Health().installHealthConnect();
+      await _ensureConfigured();
+      await _health.installHealthConnect();
     } catch (e) {
       debugPrint('HealthService: install Health Connect failed: $e');
     }
   }
 
   /// Request read permissions for steps and active calories.
-  /// Returns true if granted.
+  /// Returns true if core permissions (steps + active cal) are granted.
+  /// Also tries to get TOTAL_CALORIES_BURNED but doesn't fail if unavailable.
   Future<bool> requestPermissions() async {
     try {
-      debugPrint('HealthService: requesting permissions for $_types');
-      final granted = await Health().requestAuthorization(
-        _types,
-        permissions: _permissions,
+      await _ensureConfigured();
+
+      // Request core permissions (steps + active calories)
+      debugPrint('HealthService: requesting core permissions for $_coreTypes');
+      final coreGranted = await _health.requestAuthorization(
+        _coreTypes,
+        permissions: _corePermissions,
       );
-      debugPrint('HealthService: permissions granted = $granted');
-      _isAuthorized = granted;
-      return granted;
+      debugPrint('HealthService: core permissions granted = $coreGranted');
+
+      if (!coreGranted) {
+        _isAuthorized = false;
+        return false;
+      }
+
+      // Track which types we have permission for
+      _grantedTypes = List.from(_coreTypes);
+
+      // Try to also get TOTAL_CALORIES_BURNED (optional — fallback data source)
+      try {
+        final extraGranted = await _health.requestAuthorization(
+          _extraTypes,
+          permissions: _extraPermissions,
+        );
+        if (extraGranted) {
+          _grantedTypes.addAll(_extraTypes);
+          debugPrint('HealthService: extra permissions (TOTAL_CALORIES_BURNED) also granted');
+        } else {
+          debugPrint('HealthService: extra permissions not granted, continuing without');
+        }
+      } catch (e) {
+        debugPrint('HealthService: extra permissions failed (non-critical): $e');
+      }
+
+      _isAuthorized = true;
+      return true;
     } catch (e) {
       debugPrint('HealthService: permission request failed: $e');
       _isAuthorized = false;
@@ -86,11 +144,23 @@ class HealthService {
   /// Check if we already have permissions (without prompting the user).
   Future<bool> hasPermissions() async {
     try {
-      final result = await Health().hasPermissions(
-        _types,
-        permissions: _permissions,
+      await _ensureConfigured();
+      final result = await _health.hasPermissions(
+        _coreTypes,
+        permissions: _corePermissions,
       );
       _isAuthorized = result ?? false;
+      if (_isAuthorized && _grantedTypes.isEmpty) {
+        _grantedTypes = List.from(_coreTypes);
+        // Also check extra types
+        final extraResult = await _health.hasPermissions(
+          _extraTypes,
+          permissions: _extraPermissions,
+        );
+        if (extraResult == true) {
+          _grantedTypes.addAll(_extraTypes);
+        }
+      }
       return _isAuthorized;
     } catch (e) {
       debugPrint('HealthService: permission check failed: $e');
@@ -106,12 +176,14 @@ class HealthService {
     }
 
     try {
+      await _ensureConfigured();
       final now = DateTime.now();
       final midnight = DateTime(now.year, now.month, now.day);
 
-      // Fetch all health data points for today
-      final dataPoints = await Health().getHealthDataFromTypes(
-        types: _types,
+      // Fetch health data for today using only the types we have permission for
+      final typesToFetch = _grantedTypes.isNotEmpty ? _grantedTypes : _coreTypes;
+      final dataPoints = await _health.getHealthDataFromTypes(
+        types: typesToFetch,
         startTime: midnight,
         endTime: now,
       );
@@ -122,7 +194,7 @@ class HealthService {
       int totalCal = 0;
 
       // Remove duplicates (Health Connect can return overlapping data from multiple sources)
-      final unique = Health().removeDuplicates(dataPoints);
+      final unique = _health.removeDuplicates(dataPoints);
 
       for (final point in unique) {
         final value = point.value;

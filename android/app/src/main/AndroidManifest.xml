@@ -84,6 +84,8 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Health Connect package visibility (required for SDK status check on Android 11+) -->
+        <package android:name="com.google.android.apps.healthdata" />
         <!-- Health Connect availability check -->
         <intent>
             <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />

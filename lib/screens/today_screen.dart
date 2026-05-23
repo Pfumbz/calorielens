@@ -40,7 +40,7 @@ class TodayScreen extends StatelessWidget {
               if (state.healthEnabled)
                 _buildActivityCard(context, state)
               else if (!StorageService().healthOnboardingDismissed)
-                _HealthOnboardingPrompt(),
+                const _HealthOnboardingPrompt(),
               const SizedBox(height: 12),
               _buildCalorieRing(context, state),
               const SizedBox(height: 12),
@@ -1190,9 +1190,19 @@ class _ProfileNudgeCardState extends State<_ProfileNudgeCard> {
 // Health Connect onboarding prompt
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class _HealthOnboardingPrompt extends StatelessWidget {
+class _HealthOnboardingPrompt extends StatefulWidget {
+  const _HealthOnboardingPrompt();
+
+  @override
+  State<_HealthOnboardingPrompt> createState() => _HealthOnboardingPromptState();
+}
+
+class _HealthOnboardingPromptState extends State<_HealthOnboardingPrompt> {
+  bool _dismissed = false;
+
   @override
   Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1242,26 +1252,8 @@ class _HealthOnboardingPrompt extends StatelessWidget {
                     final state = context.read<AppState>();
                     final health = HealthService();
 
-                    // Check availability
-                    final available = await health.isHealthConnectAvailable();
-                    if (!available) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text(
-                                'Health Connect is not installed. Opening Play Store…'),
-                            backgroundColor: CLColors.surface,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
-                      }
-                      await health.installHealthConnect();
-                      return;
-                    }
-
-                    // Request permissions
+                    // Try requesting permissions directly — the SDK status
+                    // check can give false negatives on some devices.
                     final granted = await health.requestPermissions();
                     if (granted) {
                       await state.setHealthEnabled(true);
@@ -1269,7 +1261,7 @@ class _HealthOnboardingPrompt extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: const Text(
-                              'Permission not granted. You can enable this later in Settings.'),
+                              'Could not connect to Health Connect. Make sure it\'s installed and permissions are allowed.'),
                           backgroundColor: CLColors.surface,
                           behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
@@ -1297,10 +1289,9 @@ class _HealthOnboardingPrompt extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  onTap: () {
-                    StorageService().setHealthOnboardingDismissed(true);
-                    // Force rebuild
-                    (context as Element).markNeedsBuild();
+                  onTap: () async {
+                    await StorageService().setHealthOnboardingDismissed(true);
+                    setState(() => _dismissed = true);
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
