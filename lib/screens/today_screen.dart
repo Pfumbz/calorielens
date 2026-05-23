@@ -7,8 +7,8 @@ import '../services/storage_service.dart';
 import '../theme.dart';
 import '../services/health_service.dart';
 import '../widgets/ad_banner.dart';
+import '../widgets/profile_sheet.dart';
 import 'history_screen.dart';
-import 'settings_screen.dart';
 import 'week_report_screen.dart';
 
 class TodayScreen extends StatelessWidget {
@@ -1152,11 +1152,7 @@ class _ProfileNudgeCardState extends State<_ProfileNudgeCard> {
             SizedBox(
               width: double.infinity,
               child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                },
+                onTap: () => showProfileSheet(context),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
