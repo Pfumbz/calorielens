@@ -1295,7 +1295,7 @@ class _ScanScreenState extends State<ScanScreen>
                           final items = itemCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
                           if (items.isEmpty) return;
                           Navigator.pop(ctx);
-                          _reAnalyse(items);
+                          _reAnalyse(items, r);
                         },
                         icon: const Icon(Icons.auto_fix_high, size: 18),
                         label: const Text('RE-ANALYSE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 1)),
@@ -1313,7 +1313,7 @@ class _ScanScreenState extends State<ScanScreen>
     );
   }
 
-  Future<void> _reAnalyse(List<String> items) async {
+  Future<void> _reAnalyse(List<String> items, ScanResult original) async {
     final description = items.join(', ');
     setState(() { _loading = true; _result = null; _updateResultFlag(); });
     _resultAnim.reset();
@@ -1321,7 +1321,18 @@ class _ScanScreenState extends State<ScanScreen>
       final state = Provider.of<AppState>(context, listen: false);
       // Pass isCorrection: true so neither the Edge Function nor local
       // counter charge a scan — the user already spent one on the original.
-      final result = await state.backend.scanText(description, isCorrection: true);
+      final result = await state.backend.scanText(
+        description,
+        isCorrection: true,
+        originalContext: {
+          'name': original.mealName,
+          'calories': original.totalCalories,
+          'protein': original.proteinG,
+          'carbs': original.carbsG,
+          'fat': original.fatG,
+          'fiber': original.fiberG,
+        },
+      );
       setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
       // No trackScan() here — corrections are free

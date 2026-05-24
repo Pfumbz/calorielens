@@ -296,21 +296,11 @@ class TodayScreen extends StatelessWidget {
     return n.toString();
   }
 
-  // ── Calorie balance (surplus / deficit) ───────────────────────────────
+  // ── Calorie balance (eaten vs burned) ───────────────────────────────
   Widget _buildCalorieBalance(AppState state) {
     final eaten = state.totalCalories;
     final burned = state.activeCaloriesToday;
-    final net = eaten - burned;
-    final isDeficit = net <= 0;
-    final absNet = net.abs();
-
-    final color = isDeficit ? CLColors.green : CLColors.red;
-    final bgColor = isDeficit ? CLColors.greenLo : CLColors.redLo;
-    final borderColor = isDeficit
-        ? CLColors.green.withOpacity(0.15)
-        : CLColors.red.withOpacity(0.15);
-    final label = isDeficit ? 'DEFICIT' : 'SURPLUS';
-    final emoji = isDeficit ? '↓' : '↑';
+    final net = (eaten - burned).abs();
 
     // Bar proportions: how much of eaten vs burned fills the bar
     final total = eaten + burned;
@@ -320,47 +310,36 @@ class TodayScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: CLColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
+        border: Border.all(color: CLColors.border),
       ),
       child: Column(
         children: [
-          // Top row: net number + label
+          // Top row: net number
           Row(
             children: [
-              // Net calorie badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: CLColors.surface2,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '$emoji $absNet',
-                  style: TextStyle(
-                    color: color,
+                  '$net kcal',
+                  style: const TextStyle(
+                    color: CLColors.text,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                'kcal $label',
+              const Text(
+                'net difference',
                 style: TextStyle(
-                  color: color,
+                  color: CLColors.muted,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                isDeficit ? 'On track' : 'Over budget',
-                style: TextStyle(
-                  color: color.withOpacity(0.6),
-                  fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -901,15 +880,32 @@ class TodayScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            // Delete button
-            TextButton.icon(
-              onPressed: () {
-                context.read<AppState>().removeEntry(e.id);
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.delete_outline, size: 18),
-              label: const Text('Remove entry'),
-              style: TextButton.styleFrom(foregroundColor: CLColors.red),
+            // Action buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Correct button
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showCorrectionSheet(context, e);
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Correct'),
+                  style: TextButton.styleFrom(foregroundColor: CLColors.accent),
+                ),
+                const SizedBox(width: 24),
+                // Delete button
+                TextButton.icon(
+                  onPressed: () {
+                    context.read<AppState>().removeEntry(e.id);
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Remove'),
+                  style: TextButton.styleFrom(foregroundColor: CLColors.red),
+                ),
+              ],
             ),
           ],
         ),
@@ -924,6 +920,181 @@ class TodayScreen extends StatelessWidget {
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(color: CLColors.muted, fontSize: 11)),
       ],
+    );
+  }
+
+  // ── Correction sheet ──────────────────────────────────────────────────
+  void _showCorrectionSheet(BuildContext context, DiaryEntry entry) {
+    final controller = TextEditingController(text: entry.name);
+
+    bool isAnalysing = false;
+    String? errorMsg;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sbCtx, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sbCtx).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: CLColors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Handle
+                    Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(
+                        color: CLColors.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Correct this meal',
+                      style: TextStyle(
+                        color: CLColors.text,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Edit the description and we\'ll re-analyse the nutrition',
+                      style: TextStyle(color: CLColors.muted, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    // Editable text field
+                    TextField(
+                      controller: controller,
+                      maxLines: 3,
+                      style: const TextStyle(color: CLColors.text, fontSize: 15),
+                      decoration: InputDecoration(
+                        hintText: 'Describe what you ate…',
+                        hintStyle: const TextStyle(color: CLColors.muted),
+                        filled: true,
+                        fillColor: CLColors.bg,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: CLColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: CLColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: CLColors.accent),
+                        ),
+                      ),
+                    ),
+                    if (errorMsg != null) ...[
+                      const SizedBox(height: 8),
+                      Text(errorMsg!,
+                          style: const TextStyle(color: CLColors.red, fontSize: 12)),
+                    ],
+                    const SizedBox(height: 20),
+                    // Re-analyse button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: isAnalysing
+                            ? null
+                            : () async {
+                                final text = controller.text.trim();
+                                if (text.isEmpty) return;
+
+                                setSheetState(() {
+                                  isAnalysing = true;
+                                  errorMsg = null;
+                                });
+
+                                try {
+                                  final state = context.read<AppState>();
+                                  final result = await state.backend.scanText(
+                                    text,
+                                    isCorrection: true,
+                                    originalContext: {
+                                      'name': entry.name,
+                                      'calories': entry.calories,
+                                      'protein': entry.protein,
+                                      'carbs': entry.carbs,
+                                      'fat': entry.fat,
+                                      'fiber': entry.fiber,
+                                    },
+                                  );
+
+                                  // Remove old entry, add corrected one with same time
+                                  await state.removeEntry(entry.id);
+                                  final corrected = DiaryEntry(
+                                    id: DateTime.now().millisecondsSinceEpoch,
+                                    time: entry.time,
+                                    name: result.mealName,
+                                    calories: result.totalCalories,
+                                    protein: result.proteinG,
+                                    carbs: result.carbsG,
+                                    fat: result.fatG,
+                                    fiber: result.fiberG,
+                                  );
+                                  await state.addEntry(corrected);
+
+                                  if (sbCtx.mounted) Navigator.pop(sbCtx);
+
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Updated: ${result.mealName} — ${result.totalCalories} kcal',
+                                        ),
+                                        backgroundColor: CLColors.green,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  setSheetState(() {
+                                    isAnalysing = false;
+                                    errorMsg = 'Analysis failed. Please try again.';
+                                  });
+                                }
+                              },
+                        icon: isAnalysing
+                            ? const SizedBox(
+                                width: 18, height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.refresh, size: 18),
+                        label: Text(isAnalysing ? 'Analysing…' : 'Re-analyse'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CLColors.accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 

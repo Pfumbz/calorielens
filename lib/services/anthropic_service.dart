@@ -63,9 +63,37 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
   }
 
   // ── Scan text description ────────────────────────────────────────
-  Future<ScanResult> scanText(String description) async {
-    final prompt =
-        '''You are an expert nutritionist specialising in South African cuisine. Estimate the nutritional content for this meal: "$description"
+  Future<ScanResult> scanText(
+    String description, {
+    Map<String, dynamic>? originalContext,
+  }) async {
+    String prompt;
+
+    if (originalContext != null) {
+      // Correction mode: reference the original scan so the AI adjusts
+      // proportionally instead of estimating from scratch.
+      prompt =
+          '''You are an expert nutritionist. The user previously scanned a meal and is now correcting it.
+
+ORIGINAL ANALYSIS:
+- Meal name: ${originalContext['name'] ?? 'Unknown'}
+- Calories: ${originalContext['calories'] ?? '?'} kcal
+- Protein: ${originalContext['protein'] ?? '?'}g | Carbs: ${originalContext['carbs'] ?? '?'}g | Fat: ${originalContext['fat'] ?? '?'}g | Fiber: ${originalContext['fiber'] ?? '?'}g
+
+The user says the meal should actually be: "$description"
+
+INSTRUCTIONS:
+1. Compare the user's corrected description to the original analysis above.
+2. Adjust the nutrition proportionally based on what changed (e.g. if the original had 5 items but the user says there were only 3, scale down accordingly).
+3. Use the original analysis as your baseline — do NOT estimate from scratch.
+4. Be conservative. Round calories to the nearest 5.
+5. Give a concise but descriptive meal_name based on the corrected description.
+
+Respond ONLY in this exact JSON format (no markdown, no backticks):
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}''';
+    } else {
+      prompt =
+          '''You are an expert nutritionist specialising in South African cuisine. Estimate the nutritional content for this meal: "$description"
 
 INSTRUCTIONS:
 1. Identify each food component mentioned. If the description is vague (e.g. "lunch"), ask yourself what a typical South African portion would be.
@@ -76,6 +104,7 @@ INSTRUCTIONS:
 
 Respond ONLY in this exact JSON format (no markdown, no backticks):
 {"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}''';
+    }
 
     final body = jsonEncode({
       'model': _modelFast,

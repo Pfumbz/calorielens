@@ -42,20 +42,19 @@ serve(async (req) => {
     const scanLimit = isPremium ? PRO_SCAN_LIMIT : isAnonymous ? GUEST_SCAN_LIMIT : FREE_SCAN_LIMIT
 
     const body = await req.json()
-    const { description, is_correction } = body
+    const { description, is_correction, original_context } = body
 
     // Corrections (re-analysis after "Correct" button) are free — skip the counter
     if (!is_correction) {
-      // Check scan count WITHOUT incrementing (increment only after success)
-      const { data: usage } = await supabase
-        .from('usage')
-        .select('scan_count')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .maybeSingle()
+      // Atomically check + increment scan count (prevents race conditions)
+      const { data: newCount, error: rpcError } = await supabase.rpc(
+        'increment_scan_if_allowed',
+        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+      )
 
-      const currentScans = usage?.scan_count ?? 0
-      if (currentScans >= scanLimit) {
+      if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+
+      if (newCount === -1) {
         const message = isPremium
           ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
           : isAnonymous
@@ -77,9 +76,35 @@ serve(async (req) => {
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not set in environment')
 
-    const prompt = `You are a professional nutritionist. Estimate the nutritional content for this meal description: "${description}"
+    let prompt: string
+
+    if (is_correction && original_context) {
+      // Correction mode: reference the original scan so the AI adjusts
+      // proportionally instead of estimating from scratch.
+      const oc = original_context
+      prompt = `You are an expert nutritionist. The user previously scanned a meal and is now correcting it.
+
+ORIGINAL ANALYSIS:
+- Meal name: ${oc.name ?? 'Unknown'}
+- Calories: ${oc.calories ?? '?'} kcal
+- Protein: ${oc.protein ?? '?'}g | Carbs: ${oc.carbs ?? '?'}g | Fat: ${oc.fat ?? '?'}g | Fiber: ${oc.fiber ?? '?'}g
+
+The user says the meal should actually be: "${description}"
+
+INSTRUCTIONS:
+1. Compare the user's corrected description to the original analysis above.
+2. Adjust the nutrition proportionally based on what changed (e.g. if the original had 5 items but the user says there were only 3, scale down accordingly).
+3. Use the original analysis as your baseline — do NOT estimate from scratch.
+4. Be conservative. Round calories to the nearest 5.
+5. Give a concise but descriptive meal_name based on the corrected description.
+
+Respond ONLY in this exact JSON format (no markdown, no backticks):
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}`
+    } else {
+      prompt = `You are a professional nutritionist. Estimate the nutritional content for this meal description: "${description}"
 Respond ONLY in this exact JSON (no markdown):
 {"meal_name":"<short name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}`
+    }
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -104,14 +129,7 @@ Respond ONLY in this exact JSON (no markdown):
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
 
-    // Increment scan count AFTER successful AI response (so failed calls don't count)
-    if (!is_correction) {
-      await supabase.rpc(
-        'increment_scan_if_allowed',
-        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
-      )
-    }
-
+    // Usage already incremented atomically above — just return the result
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

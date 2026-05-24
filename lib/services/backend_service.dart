@@ -56,14 +56,24 @@ class BackendService {
   // ── Scan text ────────────────────────────────────────────────────────────
   /// [isCorrection] skips the server-side scan counter so corrections
   /// don't consume the user's daily quota.
-  Future<ScanResult> scanText(String description, {bool isCorrection = false}) async {
+  /// [originalContext] provides the original scan's nutrition data so the AI
+  /// can adjust proportionally rather than estimating from scratch.
+  Future<ScanResult> scanText(
+    String description, {
+    bool isCorrection = false,
+    Map<String, dynamic>? originalContext,
+  }) async {
     if (_useByok) {
-      return AnthropicService(byokApiKey!).scanText(description);
+      return AnthropicService(byokApiKey!).scanText(
+        description,
+        originalContext: originalContext,
+      );
     }
     _requireSignIn();
 
     final body = <String, dynamic>{'description': description};
     if (isCorrection) body['is_correction'] = true;
+    if (originalContext != null) body['original_context'] = originalContext;
 
     final res = await http.post(
       Uri.parse('$_functionsBaseUrl/scan-text'),
