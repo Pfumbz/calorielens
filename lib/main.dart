@@ -41,18 +41,18 @@ void main() async {
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppState()..init(),
-      child: const CalorieLensApp(),
+      child: const CalNovaApp(),
     ),
   );
 }
 
-class CalorieLensApp extends StatelessWidget {
-  const CalorieLensApp({super.key});
+class CalNovaApp extends StatelessWidget {
+  const CalNovaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CalorieLens',
+      title: 'CalNova',
       theme: buildTheme(),
       home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
@@ -150,9 +150,9 @@ class _SplashScreenState extends State<SplashScreen>
                       letterSpacing: 0.5,
                     ),
                     children: [
-                      TextSpan(text: 'Calorie'),
+                      TextSpan(text: 'Cal'),
                       TextSpan(
-                        text: 'Lens',
+                        text: 'Nova',
                         style: TextStyle(
                           color: CLColors.accent,
                           fontStyle: FontStyle.italic,
@@ -163,7 +163,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'AI-powered nutrition tracking',
+                  'AI Nutrition Companion',
                   style: TextStyle(
                     color: CLColors.muted,
                     fontSize: 13,
@@ -416,25 +416,32 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    // Back button can only exit when on Scan tab with no results showing
-    final canExitApp = _currentIndex == 0 && !ScanScreen.hasResult;
-
     return PopScope(
-      canPop: canExitApp,
-      onPopInvoked: (didPop) {
-        if (!didPop) {
-          // Priority 1: If scan results are showing, clear them first
-          if (_currentIndex == 0 && ScanScreen.hasResult) {
-            ScanScreen.clearResult?.call();
-          }
-          // Priority 2: If on Coach tab with active chat, clear chat first
-          else if (_currentIndex == 2 && CoachScreen.hasChatMessages) {
-            CoachScreen.clearChat?.call();
-          }
-          // Priority 3: Any non-Scan tab → go back to Scan
-          else {
-            setState(() => _currentIndex = 0);
-          }
+      // Always intercept back — statics like ScanScreen.isOnPhotoMode can
+      // change without triggering an AppShell rebuild, so canPop must stay
+      // false to guarantee onPopInvokedWithResult always fires.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // Priority 1: If scan results are showing, clear them first
+        if (_currentIndex == 0 && ScanScreen.hasResult) {
+          ScanScreen.clearResult?.call();
+        }
+        // Priority 2: If on Scan tab but not on Photo mode, go back to Photo
+        else if (_currentIndex == 0 && !ScanScreen.isOnPhotoMode) {
+          ScanScreen.resetToPhotoMode?.call();
+        }
+        // Priority 3: If on Coach tab with active chat, clear chat first
+        else if (_currentIndex == 2 && CoachScreen.hasChatMessages) {
+          CoachScreen.clearChat?.call();
+        }
+        // Priority 4: Any non-Scan tab → go back to Scan
+        else if (_currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+        }
+        // Priority 5: On Scan tab, Photo mode, no results → exit app
+        else {
+          SystemNavigator.pop();
         }
       },
       child: Scaffold(

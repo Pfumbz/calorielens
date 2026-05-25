@@ -52,7 +52,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
     final buf = StringBuffer();
     buf.writeln(
-        'You are CalorieLens Smart Coach — an expert AI nutrition coach that is warm, concise, and action-oriented.');
+        'You are CalNova Smart Coach — an expert AI nutrition coach that is warm, concise, and action-oriented.');
     if (name.isNotEmpty) buf.writeln('User\'s name: $name.');
     if (p.weight > 0) {
       buf.writeln(

@@ -25,6 +25,12 @@ class ScanScreen extends StatefulWidget {
   /// Clears the result and goes back to scan input (called by AppShell on back press).
   static VoidCallback? clearResult;
 
+  /// Whether the scan screen is on the default Photo tab (used by AppShell for back nav).
+  static bool isOnPhotoMode = true;
+
+  /// Resets the scan mode back to Photo (called by AppShell on back press).
+  static VoidCallback? resetToPhotoMode;
+
   @override
   State<ScanScreen> createState() => _ScanScreenState();
 }
@@ -41,6 +47,10 @@ class _ScanScreenState extends State<ScanScreen>
   bool _loading = false;
   String? _error;
   ScanResult? _result;
+
+  /// Whether the user has content ready to analyse (image selected or text typed).
+  bool get _hasContentToAnalyse =>
+      _scanMode == _ScanMode.text ? _textCtrl.text.trim().length > 3 : _imageBytes != null;
 
   // Barcode state
   bool _barcodeScanned = false;
@@ -76,12 +86,15 @@ class _ScanScreenState extends State<ScanScreen>
 
     // Wire up static callbacks for AppShell back-button handling
     ScanScreen.clearResult = _discardResult;
+    ScanScreen.resetToPhotoMode = _resetToPhoto;
   }
 
   @override
   void dispose() {
     ScanScreen.clearResult = null;
+    ScanScreen.resetToPhotoMode = null;
     ScanScreen.hasResult = false;
+    ScanScreen.isOnPhotoMode = true;
     _textCtrl.dispose();
     _barcodeNameCtrl.dispose();
     _customServingCtrl.dispose();
@@ -276,6 +289,12 @@ class _ScanScreenState extends State<ScanScreen>
         _showServingPicker = false;
       }
     });
+    ScanScreen.isOnPhotoMode = mode == _ScanMode.photo;
+  }
+
+  /// Called by AppShell when back is pressed while on a non-Photo tab.
+  void _resetToPhoto() {
+    _switchMode(_ScanMode.photo);
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -307,9 +326,14 @@ class _ScanScreenState extends State<ScanScreen>
                   _buildPhotoArea(),
                 const SizedBox(height: 14),
                 if (_error != null && _scanMode != _ScanMode.barcode) _buildError(),
-                // Analyse button
-                _buildAnalyseBtn(),
-                // Pro upsell removed from scan landing page per design review
+                // Describe mode: always show Analyse button (greyed → active)
+                // Photo mode: show banner on landing, Analyse button when image selected
+                if (_scanMode == _ScanMode.text)
+                  _buildAnalyseBtn()
+                else if (_scanMode == _ScanMode.photo && _imageBytes != null)
+                  _buildAnalyseBtn()
+                else if (_scanMode == _ScanMode.photo)
+                  _buildMealIntelligenceBanner(),
               ],
               const SizedBox(height: 20),
             ],
@@ -323,23 +347,36 @@ class _ScanScreenState extends State<ScanScreen>
   Widget _buildHeader(AppState state) {
     return Row(
       children: [
-        // CalorieLens branding
-        RichText(
-          text: const TextSpan(
-            style: TextStyle(
-              fontFamily: 'serif',
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: CLColors.text,
-            ),
-            children: [
-              TextSpan(text: 'Calorie'),
-              TextSpan(
-                text: 'Lens',
-                style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+        // CalNova branding
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(
+                  fontFamily: 'serif',
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: CLColors.text,
+                ),
+                children: [
+                  TextSpan(text: 'Cal'),
+                  TextSpan(
+                    text: 'Nova',
+                    style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const Text(
+              'AI Nutrition Companion',
+              style: TextStyle(
+                color: CLColors.muted,
+                fontSize: 11,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
         ),
         const Spacer(),
         // Status pill — combines PRO badge + scan count into one element
@@ -1166,6 +1203,68 @@ class _ScanScreenState extends State<ScanScreen>
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  // ── MEAL INTELLIGENCE BANNER (shown on landing before image/text is ready) ─
+  Widget _buildMealIntelligenceBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1814),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CLColors.accent.withOpacity(0.35)),
+      ),
+      child: Row(
+        children: [
+          // Sparkle icon in circle
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: CLColors.accent.withOpacity(0.5), width: 1.5),
+            ),
+            child: const Center(
+              child: Text('✨', style: TextStyle(fontSize: 20)),
+            ),
+          ),
+          const SizedBox(width: 14),
+          // Text content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Meal Intelligence',
+                  style: TextStyle(
+                    color: CLColors.accent,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Calories  •  Protein  •  Carbs  •  Fat',
+                  style: TextStyle(
+                    color: CLColors.text.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'AI-powered nutrition breakdown',
+                  style: TextStyle(
+                    color: CLColors.muted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

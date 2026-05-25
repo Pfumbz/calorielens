@@ -321,7 +321,7 @@ Output ONLY the 4 lines, nothing else.''';
       final response = await state.backend.chat(
         history: [],
         userMessage: prompt,
-        systemPrompt: 'You are CalorieLens, an AI nutrition coach. Output exactly 4 lines in the requested format. No extra text.',
+        systemPrompt: 'You are CalNova, an AI nutrition coach. Output exactly 4 lines in the requested format. No extra text.',
       );
       debugPrint('[WeekReport] AI response received: ${response.substring(0, response.length.clamp(0, 100))}');
       if (mounted) {

@@ -15,7 +15,7 @@ class NotificationService {
   static bool _initialised = false;
 
   // Notification channel
-  static const _channelId = 'calorielens_reminders';
+  static const _channelId = 'calnova_reminders';
   static const _channelName = 'Meal Reminders';
   static const _channelDesc = 'Reminders to log your meals and coaching nudges';
 
@@ -107,7 +107,7 @@ class NotificationService {
   static Future<void> sendTestNotification() async {
     await _plugin.show(
       999,
-      'CalorieLens is working! 🎉',
+      'CalNova is working! 🎉',
       'Notifications are set up correctly.',
       const NotificationDetails(
         android: AndroidNotificationDetails(
@@ -360,7 +360,7 @@ class NotificationService {
     );
     if (afternoonTime.isAfter(now) && caloriesEaten < calorieGoal * 0.3) {
       final msg = caloriesEaten == 0
-          ? 'You haven\'t logged any meals today. Open CalorieLens to track what you eat!'
+          ? 'You haven\'t logged any meals today. Open CalNova to track what you eat!'
           : 'You\'ve only logged $caloriesEaten kcal so far. Don\'t forget to track your meals!';
       try {
         await _plugin.zonedSchedule(

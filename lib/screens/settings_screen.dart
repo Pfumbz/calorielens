@@ -358,7 +358,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isPro ? 'CalorieLens Pro' : 'CalorieLens Free',
+                          isPro ? 'CalNova Pro' : 'CalNova Free',
                           style: const TextStyle(
                               color: CLColors.text,
                               fontSize: 16,
@@ -1260,6 +1260,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ═══════════════════════════════════════════════════════════════════════
   static const _privacyPolicyUrl =
       'https://pfumbz.github.io/calorielens/privacy-policy.html';
+  static const _termsOfServiceUrl =
+      'https://pfumbz.github.io/calorielens/terms-of-service.html';
 
   Widget _buildAboutSection() {
     return Container(
@@ -1280,6 +1282,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const Divider(color: CLColors.border, height: 1),
           _tappableRow(
+            icon: Icons.description_outlined,
+            label: 'Terms of Service',
+            labelColor: CLColors.text,
+            onTap: () => launchUrl(Uri.parse(_termsOfServiceUrl),
+                mode: LaunchMode.externalApplication),
+          ),
+          const Divider(color: CLColors.border, height: 1),
+          _tappableRow(
             icon: Icons.mail_outline,
             label: 'Contact Us',
             labelColor: CLColors.text,
@@ -1288,7 +1298,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 scheme: 'mailto',
                 path: 'makhuvhap.c@gmail.com',
                 queryParameters: {
-                  'subject': 'CalorieLens Feedback',
+                  'subject': 'CalNova Feedback',
                 },
               );
               if (await canLaunchUrl(uri)) {

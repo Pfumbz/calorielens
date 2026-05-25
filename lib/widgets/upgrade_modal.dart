@@ -102,7 +102,7 @@ class _UpgradeModalState extends State<UpgradeModal> {
       case 'history':
         return "Free accounts keep 7 days of meal history. Upgrade to Pro for unlimited history — never lose your progress.";
       default:
-        return "Upgrade to Pro to remove all limits and unlock the complete CalorieLens experience.";
+        return "Upgrade to Pro to remove all limits and unlock the complete CalNova experience.";
     }
   }
 
@@ -219,8 +219,8 @@ class _UpgradeModalState extends State<UpgradeModal> {
                 text: const TextSpan(
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: CLColors.text),
                   children: [
-                    TextSpan(text: 'Calorie'),
-                    TextSpan(text: 'Lens', style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic)),
+                    TextSpan(text: 'Cal'),
+                    TextSpan(text: 'Nova', style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic)),
                   ],
                 ),
               ),

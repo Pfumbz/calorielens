@@ -1,20 +1,20 @@
-# CalorieLens — Google Play Store Listing
+# CalNova — Google Play Store Listing
 
 ## App Name (30 chars max)
-CalorieLens - AI Nutrition
+CalNova - AI Nutrition
 
 ## Short Description (80 chars max)
 Snap a photo of any meal and get instant AI-powered calorie and macro estimates.
 
 ## Full Description (4000 chars max)
 
-CalorieLens uses advanced AI to make nutrition tracking effortless. Simply take a photo of your meal, and our AI instantly identifies each food item and provides detailed calorie and macronutrient estimates — no manual searching or logging required.
+CalNova uses advanced AI to make nutrition tracking effortless. Simply take a photo of your meal, and our AI instantly identifies each food item and provides detailed calorie and macronutrient estimates — no manual searching or logging required.
 
-Whether you're managing your weight, building muscle, or simply eating more mindfully, CalorieLens gives you the tools to understand exactly what's on your plate.
+Whether you're managing your weight, building muscle, or simply eating more mindfully, CalNova gives you the tools to understand exactly what's on your plate.
 
 HOW IT WORKS
 
-Point your camera at any meal and tap scan. Within seconds, CalorieLens breaks down each food item with estimated calories, protein, carbs, and fat. You can also type a description of your meal or scan a product barcode for packaged foods.
+Point your camera at any meal and tap scan. Within seconds, CalNova breaks down each food item with estimated calories, protein, carbs, and fat. You can also type a description of your meal or scan a product barcode for packaged foods.
 
 Your scans are saved to a daily diary so you can track your intake throughout the day and see how each meal contributes to your overall goal.
 

@@ -277,21 +277,30 @@ class _LoginScreenState extends State<LoginScreen>
     return Row(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.asset('assets/logo_small.png', width: 44, height: 44),
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset('assets/logo.png', width: 56, height: 56),
         ),
-        const SizedBox(width: 12),
-        RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: CLColors.text),
-            children: [
-              TextSpan(text: 'Calorie'),
-              TextSpan(
-                text: 'Lens',
-                style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+        const SizedBox(width: 14),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: CLColors.text, fontFamily: 'serif'),
+                children: [
+                  TextSpan(text: 'Cal'),
+                  TextSpan(
+                    text: 'Nova',
+                    style: TextStyle(color: CLColors.accent, fontStyle: FontStyle.italic),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const Text(
+              'AI Nutrition Companion',
+              style: TextStyle(color: CLColors.muted, fontSize: 12),
+            ),
+          ],
         ),
       ],
     );
@@ -304,11 +313,11 @@ class _LoginScreenState extends State<LoginScreen>
     if (_isSignUp) {
       title = _isFromSettings ? 'Create your free account' : 'Create your account';
       subtitle = _isFromSettings
-          ? 'Sync your meals across devices and unlock ${AppState.freeScanLimit} AI scans/day'
+          ? 'Sync your meals across devices\nand unlock ${AppState.freeScanLimit} AI scans/day'
           : 'Sign up for free — ${AppState.freeScanLimit} AI scans/day included';
     } else {
       title = 'Welcome back';
-      subtitle = 'Sign in to sync your meals and unlock AI features';
+      subtitle = 'Sign in to sync your meals\nand unlock AI features';
     }
 
     return Column(
@@ -340,7 +349,7 @@ class _LoginScreenState extends State<LoginScreen>
       style: const TextStyle(color: CLColors.text),
       decoration: const InputDecoration(
         hintText: 'Email address',
-        prefixIcon: Icon(Icons.email_outlined, size: 18, color: CLColors.muted),
+        prefixIcon: Icon(Icons.mail_outline, size: 18, color: CLColors.accent),
       ),
     );
   }
@@ -355,7 +364,7 @@ class _LoginScreenState extends State<LoginScreen>
       style: const TextStyle(color: CLColors.text),
       decoration: InputDecoration(
         hintText: _isSignUp ? 'Create a password (min. 6 chars)' : 'Password',
-        prefixIcon: const Icon(Icons.lock_outline, size: 18, color: CLColors.muted),
+        prefixIcon: const Icon(Icons.lock_outline, size: 18, color: CLColors.accent),
         suffixIcon: IconButton(
           icon: Icon(
             _pwVisible ? Icons.visibility_off : Icons.visibility,
@@ -396,7 +405,7 @@ class _LoginScreenState extends State<LoginScreen>
           minimumSize: Size.zero,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
-        child: const Text('Forgot password?', style: TextStyle(color: CLColors.muted, fontSize: 12)),
+        child: const Text('Forgot password?', style: TextStyle(color: CLColors.accent, fontSize: 12)),
       ),
     );
   }
@@ -580,7 +589,7 @@ class _LoginScreenState extends State<LoginScreen>
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: _loading ? null : _googleSignIn,
-        icon: const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: CLColors.text)),
+        icon: const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4285F4))),
         label: const Text(
           'Continue with Google',
           style: TextStyle(color: CLColors.text, fontWeight: FontWeight.w600),
@@ -628,37 +637,40 @@ class _LoginScreenState extends State<LoginScreen>
       );
     }
 
-    return Center(
-      child: GestureDetector(
-        onTap: _continueAsGuest,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: CLColors.muted.withOpacity(0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.person_outline, size: 16, color: CLColors.muted),
-              const SizedBox(width: 8),
-              Column(
+    return GestureDetector(
+      onTap: _continueAsGuest,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CLColors.border),
+          color: CLColors.surface,
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.person_outline, size: 22, color: CLColors.accent),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
                   Text(
                     'Continue as Guest',
-                    style: TextStyle(color: CLColors.text, fontSize: 13, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: CLColors.text, fontSize: 15, fontWeight: FontWeight.w600),
                   ),
-                  SizedBox(height: 1),
+                  SizedBox(height: 2),
                   Text(
                     '${AppState.guestScanLimit} free scans/day · no account needed',
-                    style: TextStyle(color: CLColors.muted, fontSize: 10),
+                    style: TextStyle(color: CLColors.muted, fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-              const SizedBox(width: 6),
-              const Icon(Icons.arrow_forward_ios, size: 12, color: CLColors.muted),
-            ],
-          ),
+            ),
+            const Icon(Icons.chevron_right, size: 22, color: CLColors.accent),
+          ],
         ),
       ),
     );

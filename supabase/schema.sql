@@ -1,5 +1,5 @@
 -- ============================================================
--- CalorieLens — Supabase Database Schema
+-- CalNova — Supabase Database Schema
 -- Run this in: Supabase Dashboard → SQL Editor → New query
 -- ============================================================
 

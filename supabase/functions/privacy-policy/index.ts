@@ -3,7 +3,7 @@ const html = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CalorieLens - Privacy Policy</title>
+  <title>CalNova - Privacy Policy</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -32,7 +32,7 @@ const html = `<!DOCTYPE html>
     <p style="font-size: 20px; color: #F5EDE0;">Calorie<span class="brand">Lens</span></p>
     <p class="updated">Last updated: 21 May 2026</p>
 
-    <p>CalorieLens (&ldquo;the App&rdquo;) is developed and operated by PC Mac Studios (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;). This Privacy Policy explains what information we collect, how we use it, and your choices regarding your data.</p>
+    <p>CalNova (&ldquo;the App&rdquo;) is developed and operated by PC Mac Studios (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;). This Privacy Policy explains what information we collect, how we use it, and your choices regarding your data.</p>
 
     <h2>1. Information We Collect</h2>
     <p>We collect only the information necessary to provide the App&rsquo;s core features:</p>
@@ -41,8 +41,8 @@ const html = `<!DOCTYPE html>
       <li><strong>Profile information:</strong> You may optionally provide your name, age, weight, and height to receive personalised calorie targets. This data is stored in your user profile.</li>
       <li><strong>Diary entries:</strong> Meals you log (food names, calorie and macro estimates, timestamps) are stored to track your daily nutrition.</li>
       <li><strong>Scan data:</strong> When you scan a meal using the camera, the image is sent to our AI service (Anthropic Claude) for nutritional analysis. We do not permanently store the images &mdash; they are processed in real time and discarded.</li>
-      <li><strong>Voice input:</strong> You may optionally use your device&rsquo;s microphone to describe meals by voice. Speech is processed entirely on your device using Android&rsquo;s built-in speech recogniser. CalorieLens receives only the transcribed text &mdash; no audio is recorded, stored, or transmitted by the App.</li>
-      <li><strong>Health and fitness data:</strong> You may optionally connect CalorieLens to Android Health Connect to read your daily step count and active calories burned from your fitness watch or phone sensors. This data is read locally from Health Connect on your device and is used solely to display your activity and optionally adjust your calorie goal. <strong>We do not transmit, upload, or store your health data on any server.</strong> All health data stays on your device. You can disconnect Health Connect at any time in the App&rsquo;s Settings, and no health data is retained after disconnection.</li>
+      <li><strong>Voice input:</strong> You may optionally use your device&rsquo;s microphone to describe meals by voice. Speech is processed entirely on your device using Android&rsquo;s built-in speech recogniser. CalNova receives only the transcribed text &mdash; no audio is recorded, stored, or transmitted by the App.</li>
+      <li><strong>Health and fitness data:</strong> You may optionally connect CalNova to Android Health Connect to read your daily step count and active calories burned from your fitness watch or phone sensors. This data is read locally from Health Connect on your device and is used solely to display your activity and optionally adjust your calorie goal. <strong>We do not transmit, upload, or store your health data on any server.</strong> All health data stays on your device. You can disconnect Health Connect at any time in the App&rsquo;s Settings, and no health data is retained after disconnection.</li>
       <li><strong>Usage data:</strong> We track your daily scan and chat counts to manage service limits. No browsing history, location data, or device identifiers are collected.</li>
     </ul>
 
@@ -69,7 +69,7 @@ const html = `<!DOCTYPE html>
       <li><strong>Google Sign-In</strong> (optional authentication method): <a href="https://policies.google.com/privacy">policies.google.com/privacy</a></li>
       <li><strong>Pexels</strong> (meal plan images): <a href="https://www.pexels.com/privacy-policy/">pexels.com/privacy-policy</a></li>
       <li><strong>Open Food Facts</strong> (barcode nutrition lookup): <a href="https://world.openfoodfacts.org/privacy">openfoodfacts.org/privacy</a></li>
-      <li><strong>Android Health Connect</strong> (optional fitness data): <a href="https://developer.android.com/health-and-fitness/guides/health-connect/develop/get-started">developer.android.com/health-connect</a>. CalorieLens reads step count and active calories burned from Health Connect on your device. <strong>No health data is transmitted to our servers.</strong> All processing occurs locally on your device.</li>
+      <li><strong>Android Health Connect</strong> (optional fitness data): <a href="https://developer.android.com/health-and-fitness/guides/health-connect/develop/get-started">developer.android.com/health-connect</a>. CalNova reads step count and active calories burned from Health Connect on your device. <strong>No health data is transmitted to our servers.</strong> All processing occurs locally on your device.</li>
     </ul>
 
     <h2>5. Advertisements</h2>
@@ -91,7 +91,7 @@ const html = `<!DOCTYPE html>
     <p>If you are located in South Africa, you have rights under the Protection of Personal Information Act (POPIA), including the right to request access to and correction of your personal information.</p>
 
     <h2>8. Children&rsquo;s Privacy</h2>
-    <p>CalorieLens is not intended for children under the age of 13. We do not knowingly collect personal information from children. If you believe a child has provided us with personal data, please contact us and we will delete it promptly.</p>
+    <p>CalNova is not intended for children under the age of 13. We do not knowingly collect personal information from children. If you believe a child has provided us with personal data, please contact us and we will delete it promptly.</p>
 
     <h2>9. Changes to This Policy</h2>
     <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated &ldquo;Last updated&rdquo; date. Continued use of the App after changes constitutes acceptance of the revised policy.</p>

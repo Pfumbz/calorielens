@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>CalorieLens</string>
+	<string>CalNova</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>calorielens</string>
+	<string>CalNova</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -46,11 +46,11 @@
 
 	<!-- Camera and photo library permissions — required for meal scanning -->
 	<key>NSCameraUsageDescription</key>
-	<string>CalorieLens uses your camera to photograph meals for AI calorie analysis.</string>
+	<string>CalNova uses your camera to photograph meals for AI calorie analysis.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>CalorieLens accesses your photo library so you can choose an existing meal photo for analysis.</string>
+	<string>CalNova accesses your photo library so you can choose an existing meal photo for analysis.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>CalorieLens saves meal photos to your photo library.</string>
+	<string>CalNova saves meal photos to your photo library.</string>
 
 	<!-- Network access for Anthropic API and exercise images -->
 	<key>NSAppTransportSecurity</key>

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart' as iap;
 
-/// Google Play product ID for the CalorieLens Pro monthly subscription.
+/// Google Play product ID for the CalNova Pro monthly subscription.
 /// Must match the product ID created in Google Play Console.
 const String kProMonthlyId = 'calorielens_pro_monthly';
 

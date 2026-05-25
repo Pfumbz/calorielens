@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CalorieLens is a Flutter-based AI nutrition tracking app (Android primary, iOS future). Users photograph or describe meals; the app uses Claude Haiku to analyse nutrition and provides an AI coaching chat. The backend runs on Supabase (Edge Functions + PostgreSQL + Auth).
+CalNova is a Flutter-based AI nutrition tracking app (Android primary, iOS future). Users photograph or describe meals; the app uses Claude Haiku to analyse nutrition and provides an AI coaching chat. The backend runs on Supabase (Edge Functions + PostgreSQL + Auth).
 
 **Current target:** Android (debug builds via `flutter run`, release via Codemagic CI/CD at github.com/Pfumbz/calorielens).
 

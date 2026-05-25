@@ -1,4 +1,4 @@
-# CalorieLens — Flutter Setup Guide
+# CalNova — Flutter Setup Guide
 
 ## Step 1 — Install Flutter SDK (if not already done)
 
@@ -30,7 +30,7 @@ Fix any issues it reports (Android Studio / Xcode / device).
 
 ## Step 4 — Open this project
 
-In VS Code: **File → Open Folder** → select this `CalorieLens_Flutter` folder.
+In VS Code: **File → Open Folder** → select this `CalNova_Flutter` folder.
 
 ## Step 5 — Get packages
 
@@ -63,7 +63,7 @@ flutter run
 lib/
 ├── main.dart               ← App entry point & bottom navigation
 ├── app_state.dart          ← Global state (Provider)
-├── theme.dart              ← Dark CalorieLens colour palette
+├── theme.dart              ← Dark CalNova colour palette
 ├── models/
 │   └── models.dart         ← DiaryEntry, ScanResult, UserProfile, etc.
 ├── services/

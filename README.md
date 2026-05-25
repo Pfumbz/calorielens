@@ -1,6 +1,6 @@
-# calorielens
+# CalNova
 
-A new Flutter project.
+AI Nutrition Companion — AI-powered calorie scanner and nutrition coach built with Flutter.
 
 ## Getting Started
 
