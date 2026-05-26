@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'anthropic_service.dart';
 import 'supabase_service.dart';
+import 'usda_service.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// BackendService — the single entry point for all AI requests.
@@ -36,21 +37,34 @@ class BackendService {
 
   // ── Scan image ───────────────────────────────────────────────────────────
   Future<ScanResult> scanImage(Uint8List imageBytes, String mediaType) async {
+    ScanResult aiResult;
+    Map<String, dynamic>? rawJson;
+
     if (_useByok) {
-      return AnthropicService(byokApiKey!).scanImage(imageBytes, mediaType);
+      final (result, raw) = await AnthropicService(byokApiKey!).scanImageWithRaw(imageBytes, mediaType);
+      aiResult = result;
+      rawJson = raw;
+    } else {
+      _requireSignIn();
+
+      final res = await http.post(
+        Uri.parse('$_functionsBaseUrl/scan-image'),
+        headers: _authHeaders,
+        body: jsonEncode({
+          'imageBase64': base64Encode(imageBytes),
+          'mediaType': mediaType,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      aiResult = _parseScanResponse(res);
+      // Parse raw JSON to extract usda_query fields
+      try {
+        rawJson = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {}
     }
-    _requireSignIn();
 
-    final res = await http.post(
-      Uri.parse('$_functionsBaseUrl/scan-image'),
-      headers: _authHeaders,
-      body: jsonEncode({
-        'imageBase64': base64Encode(imageBytes),
-        'mediaType': mediaType,
-      }),
-    ).timeout(const Duration(seconds: 30));
-
-    return _parseScanResponse(res);
+    // Enrich with USDA data (non-blocking — falls back to AI estimates)
+    return _enrichWithUsdaFromRaw(aiResult, rawJson);
   }
 
   // ── Scan text ────────────────────────────────────────────────────────────
@@ -63,25 +77,39 @@ class BackendService {
     bool isCorrection = false,
     Map<String, dynamic>? originalContext,
   }) async {
+    ScanResult aiResult;
+    Map<String, dynamic>? rawJson;
+
     if (_useByok) {
-      return AnthropicService(byokApiKey!).scanText(
+      final (result, raw) = await AnthropicService(byokApiKey!).scanTextWithRaw(
         description,
         originalContext: originalContext,
       );
+      aiResult = result;
+      rawJson = raw;
+    } else {
+      _requireSignIn();
+
+      final body = <String, dynamic>{'description': description};
+      if (isCorrection) body['is_correction'] = true;
+      if (originalContext != null) body['original_context'] = originalContext;
+
+      final res = await http.post(
+        Uri.parse('$_functionsBaseUrl/scan-text'),
+        headers: _authHeaders,
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 30));
+
+      aiResult = _parseScanResponse(res);
+      try {
+        rawJson = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {}
     }
-    _requireSignIn();
 
-    final body = <String, dynamic>{'description': description};
-    if (isCorrection) body['is_correction'] = true;
-    if (originalContext != null) body['original_context'] = originalContext;
+    // Skip USDA enrichment for corrections (the user is fixing names, not nutrition)
+    if (isCorrection) return aiResult;
 
-    final res = await http.post(
-      Uri.parse('$_functionsBaseUrl/scan-text'),
-      headers: _authHeaders,
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 30));
-
-    return _parseScanResponse(res);
+    return _enrichWithUsdaFromRaw(aiResult, rawJson);
   }
 
   // ── Generate meal plan ────────────────────────────────────────────────
@@ -170,6 +198,103 @@ class BackendService {
 
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     return data['response'] as String? ?? '';
+  }
+
+  // ── USDA enrichment ──────────────────────────────────────────────────────
+  /// After an AI scan, look up each food item in USDA FoodData Central and
+  /// recalculate nutrition using lab-verified per-100g data × estimated grams.
+  /// Falls back to the AI's original estimates if USDA lookup fails.
+  ///
+  /// [rawJson] is the raw parsed JSON from the AI response, used to extract
+  /// the `usda_query` field that the AI provides for better USDA matching.
+  Future<ScanResult> _enrichWithUsdaFromRaw(
+    ScanResult aiResult,
+    Map<String, dynamic>? rawJson,
+  ) async {
+    // Extract usda_query values from raw JSON items (AI provides these for
+    // better USDA matching than the display name)
+    final rawItems = (rawJson?['items'] as List?) ?? [];
+    final usdaQueries = <int, String>{}; // index → usda_query
+
+    for (int i = 0; i < rawItems.length && i < aiResult.items.length; i++) {
+      final raw = rawItems[i] as Map<String, dynamic>?;
+      final q = raw?['usda_query'] as String?;
+      if (q != null && q.isNotEmpty) {
+        usdaQueries[i] = q.toLowerCase().trim();
+      }
+    }
+
+    // Build lookup list: prefer usda_query, fall back to item name
+    final queryToIndices = <String, List<int>>{};
+    for (int i = 0; i < aiResult.items.length; i++) {
+      final item = aiResult.items[i];
+      if (item.weightG == null || item.weightG! <= 0) continue;
+
+      final query = usdaQueries[i] ?? item.name.toLowerCase().trim();
+      if (query.isEmpty) continue;
+      queryToIndices.putIfAbsent(query, () => []).add(i);
+    }
+
+    if (queryToIndices.isEmpty) return aiResult;
+
+    // Look up all unique queries in USDA in parallel
+    final usdaResults = await UsdaService.lookupFoods(queryToIndices.keys.toList());
+
+    if (usdaResults.isEmpty) return aiResult;
+
+    // Rebuild items with USDA nutrition data where available
+    final enrichedItems = List<FoodItem>.from(aiResult.items);
+    int totalCal = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalFiber = 0;
+    int usdaCount = 0;
+
+    for (int i = 0; i < aiResult.items.length; i++) {
+      final item = aiResult.items[i];
+      final query = usdaQueries[i] ?? item.name.toLowerCase().trim();
+      final usda = usdaResults[query];
+
+      if (usda != null && item.weightG != null && item.weightG! > 0) {
+        // Use USDA data: per-100g values × (weight_g / 100)
+        final nutrition = usda.forGrams(item.weightG!);
+        enrichedItems[i] = item.copyWith(
+          calories: nutrition['calories']!,
+          source: 'usda',
+          note: item.note.isEmpty
+              ? 'USDA verified'
+              : '${item.note} · USDA verified',
+        );
+        totalCal += nutrition['calories']!;
+        totalProtein += nutrition['protein']!;
+        totalCarbs += nutrition['carbs']!;
+        totalFat += nutrition['fat']!;
+        totalFiber += nutrition['fiber']!;
+        usdaCount++;
+      } else {
+        // Keep AI estimate as fallback
+        totalCal += item.calories;
+        // Proportionally attribute macros from original totals
+        final calShare = aiResult.totalCalories == 0
+            ? 0.0
+            : item.calories / aiResult.totalCalories;
+        totalProtein += (aiResult.proteinG * calShare).round();
+        totalCarbs += (aiResult.carbsG * calShare).round();
+        totalFat += (aiResult.fatG * calShare).round();
+        totalFiber += (aiResult.fiberG * calShare).round();
+      }
+    }
+
+    // If no USDA matches, return the original AI result unchanged
+    if (usdaCount == 0) return aiResult;
+
+    return ScanResult(
+      mealName: aiResult.mealName,
+      totalCalories: totalCal,
+      proteinG: totalProtein,
+      carbsG: totalCarbs,
+      fatG: totalFat,
+      fiberG: totalFiber,
+      items: enrichedItems,
+      overallNotes: aiResult.overallNotes,
+    );
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────

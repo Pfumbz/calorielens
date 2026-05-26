@@ -104,13 +104,15 @@ serve(async (req) => {
 INSTRUCTIONS:
 1. Identify every distinct food item visible in the photo. Look carefully — don't miss sides, sauces, or drinks.
 2. Estimate realistic portion sizes based on the plate/bowl size and food volume. Use standard portion references (a fist ≈ 1 cup, palm ≈ 100g meat, thumb ≈ 1 tbsp).
-3. For South African dishes (e.g. pap, chakalaka, bunny chow, boerewors, vetkoek, samp & beans, mogodu, morogo), use nutrition data specific to those foods — do NOT substitute with generic Western equivalents.
-4. When uncertain about a food item, name your best guess and note the uncertainty in that item's "note" field.
-5. Round calories to the nearest 5. Be conservative rather than over-estimating.
-6. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
+3. For EACH item, estimate the weight in grams (weight_g). This is critical — be as accurate as possible.
+4. For EACH item, provide a "usda_query" — a simple, generic English food name suitable for searching the USDA database (e.g. "rice white cooked", "chicken breast grilled", "cheddar cheese"). Avoid brand names.
+5. For South African dishes (e.g. pap, chakalaka, bunny chow, boerewors, vetkoek, samp & beans, mogodu, morogo), use nutrition data specific to those foods — do NOT substitute with generic Western equivalents.
+6. When uncertain about a food item, name your best guess and note the uncertainty in that item's "note" field.
+7. Round calories to the nearest 5. Be conservative rather than over-estimating.
+8. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
 
 Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
-{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

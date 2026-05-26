@@ -20,21 +20,33 @@ class AnthropicService {
         'anthropic-dangerous-direct-browser-access': 'true',
       };
 
-  // ── Scan image ───────────────────────────────────────────────────
-  Future<ScanResult> scanImage(Uint8List imageBytes, String mediaType) async {
-    const prompt = '''You are an expert nutritionist specialising in South African cuisine. Analyse this meal photo and estimate its nutritional content.
+  // ── Image scan prompt ─────────────────────────────────────────────
+  static const _imageScanPrompt = '''You are an expert nutritionist specialising in South African cuisine. Analyse this meal photo and estimate its nutritional content.
 
 INSTRUCTIONS:
 1. Identify every distinct food item visible in the photo. Look carefully — don't miss sides, sauces, or drinks.
 2. Estimate realistic portion sizes based on the plate/bowl size and food volume. Use standard portion references (a fist ≈ 1 cup, palm ≈ 100g meat, thumb ≈ 1 tbsp).
-3. For South African dishes (e.g. pap, chakalaka, bunny chow, boerewors, vetkoek, samp & beans, mogodu, morogo), use nutrition data specific to those foods — do NOT substitute with generic Western equivalents.
-4. When uncertain about a food item, name your best guess and note the uncertainty in that item's "note" field.
-5. Round calories to the nearest 5. Be conservative rather than over-estimating.
-6. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
+3. For EACH item, estimate the weight in grams (weight_g). This is critical — be as accurate as possible.
+4. For EACH item, provide a "usda_query" — a simple, generic English food name suitable for searching the USDA database (e.g. "rice white cooked", "chicken breast grilled", "cheddar cheese"). Avoid brand names.
+5. For South African dishes (e.g. pap, chakalaka, bunny chow, boerewors, vetkoek, samp & beans, mogodu, morogo), use nutrition data specific to those foods — do NOT substitute with generic Western equivalents.
+6. When uncertain about a food item, name your best guess and note the uncertainty in that item's "note" field.
+7. Round calories to the nearest 5. Be conservative rather than over-estimating.
+8. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
 
 Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
-{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}''';
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}''';
 
+  // ── Scan image ───────────────────────────────────────────────────
+  Future<ScanResult> scanImage(Uint8List imageBytes, String mediaType) async {
+    final (result, _) = await scanImageWithRaw(imageBytes, mediaType);
+    return result;
+  }
+
+  /// Scan image and return both the ScanResult and raw JSON (for USDA query extraction).
+  Future<(ScanResult, Map<String, dynamic>)> scanImageWithRaw(
+    Uint8List imageBytes,
+    String mediaType,
+  ) async {
     final b64 = base64Encode(imageBytes);
     final body = jsonEncode({
       'model': _modelVision,
@@ -51,7 +63,7 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
                 'data': b64,
               }
             },
-            {'type': 'text', 'text': prompt}
+            {'type': 'text', 'text': _imageScanPrompt}
           ]
         }
       ]
@@ -59,7 +71,7 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
 
     final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
         .timeout(const Duration(seconds: 30));
-    return _parseResponse(res);
+    return _parseResponseWithRaw(res);
   }
 
   // ── Scan text description ────────────────────────────────────────
@@ -98,12 +110,14 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
 INSTRUCTIONS:
 1. Identify each food component mentioned. If the description is vague (e.g. "lunch"), ask yourself what a typical South African portion would be.
 2. Use standard adult portion sizes unless the user specifies otherwise.
-3. For SA-specific foods (pap, chakalaka, boerewors, bunny chow, vetkoek, samp, mogodu, morogo, etc.), use nutrition data specific to those foods.
-4. Round calories to the nearest 5. Be conservative.
-5. Give a concise but descriptive meal_name.
+3. For EACH item, estimate the weight in grams (weight_g). This is critical for accuracy.
+4. For EACH item, provide a "usda_query" — a simple, generic English food name for USDA database lookup (e.g. "rice white cooked", "chicken breast grilled").
+5. For SA-specific foods (pap, chakalaka, boerewors, bunny chow, vetkoek, samp, mogodu, morogo, etc.), use nutrition data specific to those foods.
+6. Round calories to the nearest 5. Be conservative.
+7. Give a concise but descriptive meal_name.
 
 Respond ONLY in this exact JSON format (no markdown, no backticks):
-{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}''';
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief>"}],"overall_notes":"<2-3 sentences>"}''';
     }
 
     final body = jsonEncode({
@@ -122,7 +136,66 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
     return _parseResponse(res);
   }
 
-  ScanResult _parseResponse(http.Response res) {
+  /// Same as [scanText] but also returns raw JSON for USDA query extraction.
+  Future<(ScanResult, Map<String, dynamic>)> scanTextWithRaw(
+    String description, {
+    Map<String, dynamic>? originalContext,
+  }) async {
+    // Build the same prompt as scanText
+    String prompt;
+    if (originalContext != null) {
+      prompt =
+          '''You are an expert nutritionist. The user previously scanned a meal and is now correcting it.
+
+ORIGINAL ANALYSIS:
+- Meal name: ${originalContext['name'] ?? 'Unknown'}
+- Calories: ${originalContext['calories'] ?? '?'} kcal
+- Protein: ${originalContext['protein'] ?? '?'}g | Carbs: ${originalContext['carbs'] ?? '?'}g | Fat: ${originalContext['fat'] ?? '?'}g | Fiber: ${originalContext['fiber'] ?? '?'}g
+
+The user says the meal should actually be: "$description"
+
+INSTRUCTIONS:
+1. Compare the user's corrected description to the original analysis above.
+2. Adjust the nutrition proportionally based on what changed.
+3. Use the original analysis as your baseline — do NOT estimate from scratch.
+4. Be conservative. Round calories to the nearest 5.
+5. Give a concise but descriptive meal_name based on the corrected description.
+
+Respond ONLY in this exact JSON format (no markdown, no backticks):
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}''';
+    } else {
+      prompt =
+          '''You are an expert nutritionist specialising in South African cuisine. Estimate the nutritional content for this meal: "$description"
+
+INSTRUCTIONS:
+1. Identify each food component mentioned.
+2. Use standard adult portion sizes unless the user specifies otherwise.
+3. For EACH item, estimate the weight in grams (weight_g). This is critical for accuracy.
+4. For EACH item, provide a "usda_query" — a simple, generic English food name for USDA database lookup.
+5. For SA-specific foods, use nutrition data specific to those foods.
+6. Round calories to the nearest 5. Be conservative.
+7. Give a concise but descriptive meal_name.
+
+Respond ONLY in this exact JSON format (no markdown, no backticks):
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief>"}],"overall_notes":"<2-3 sentences>"}''';
+    }
+
+    final body = jsonEncode({
+      'model': _modelFast,
+      'max_tokens': 1024,
+      'messages': [
+        {'role': 'user', 'content': prompt}
+      ]
+    });
+
+    final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
+    return _parseResponseWithRaw(res);
+  }
+
+  /// Parse the Anthropic API response and return both the ScanResult and
+  /// the raw parsed JSON (needed for extracting usda_query fields).
+  (ScanResult, Map<String, dynamic>) _parseResponseWithRaw(http.Response res) {
     if (res.statusCode != 200) {
       final err = jsonDecode(res.body);
       throw Exception(err['error']?['message'] ?? 'API error ${res.statusCode}');
@@ -133,7 +206,11 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
         .join('');
     final clean = raw.replaceAll('```json', '').replaceAll('```', '').trim();
     final parsed = jsonDecode(clean) as Map<String, dynamic>;
-    return ScanResult.fromJson(parsed);
+    return (ScanResult.fromJson(parsed), parsed);
+  }
+
+  ScanResult _parseResponse(http.Response res) {
+    return _parseResponseWithRaw(res).$1;
   }
 
   // ── Generate meal plan ───────────────────────────────────────────

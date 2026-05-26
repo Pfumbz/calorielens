@@ -102,11 +102,20 @@ class FoodItem {
   final int calories;
   final String note;
 
+  /// Estimated weight in grams (used for USDA nutrition lookup).
+  /// Null if AI didn't provide a weight estimate.
+  final double? weightG;
+
+  /// Where the calorie data came from: 'usda', 'ai', or 'openfoodfacts'.
+  final String source;
+
   FoodItem({
     required this.name,
     required this.portion,
     required this.calories,
     required this.note,
+    this.weightG,
+    this.source = 'ai',
   });
 
   factory FoodItem.fromJson(Map<String, dynamic> j) => FoodItem(
@@ -114,6 +123,25 @@ class FoodItem {
         portion: (j['portion'] ?? '') as String,
         calories: _toInt(j['calories']),
         note: (j['note'] ?? '') as String,
+        weightG: j['weight_g'] != null ? _toDouble(j['weight_g']) : null,
+        source: (j['source'] ?? 'ai') as String,
+      );
+
+  FoodItem copyWith({
+    String? name,
+    String? portion,
+    int? calories,
+    String? note,
+    double? weightG,
+    String? source,
+  }) =>
+      FoodItem(
+        name: name ?? this.name,
+        portion: portion ?? this.portion,
+        calories: calories ?? this.calories,
+        note: note ?? this.note,
+        weightG: weightG ?? this.weightG,
+        source: source ?? this.source,
       );
 }
 

@@ -164,3 +164,9 @@ Edge Functions require the `ANTHROPIC_API_KEY` secret set in Supabase Dashboard 
 - Individual "Log this meal" buttons added to meal plan detail cards (+ icon, logs single meal to diary)
 - Pro status messaging: "Pro insights active" on Coach, "Pro · X left today" on Scan, detailed feature list in Settings
 - Settings Pro section now shows detailed feature checklist with scan usage instead of icon row
+- USDA FoodData Central API integration: after AI identifies food items and estimates portion weights (grams), each item is looked up in the USDA database for lab-verified per-100g nutrition data. Calories are recalculated as `USDA_per100g × (weight_g / 100)`. Items successfully matched show a green "USDA" badge in scan results. Falls back to AI estimates if USDA lookup fails. Service at `lib/services/usda_service.dart`. Currently uses DEMO_KEY (30 req/hr) — obtain a free key from https://fdc.nal.usda.gov/api-key-signup.html for production.
+- AI scan prompts updated to output `weight_g` (grams) and `usda_query` (generic USDA search term) per food item
+- Renamed CalorieLens → CalNova across all user-facing strings, docs, and email templates
+- Added Terms of Service at `docs/terms-of-service.html`, linked from Settings
+- Premium orbiting particles loading animation during AI analysis (`lib/widgets/analysis_loading.dart`)
+- Google logo on login screen uses actual PNG asset instead of styled text

@@ -1558,7 +1558,27 @@ class _ScanScreenState extends State<ScanScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.name, style: const TextStyle(color: CLColors.text, fontSize: 13, fontWeight: FontWeight.w500)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(item.name, style: const TextStyle(color: CLColors.text, fontSize: 13, fontWeight: FontWeight.w500)),
+                    ),
+                    if (item.source == 'usda') ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E7D32).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'USDA',
+                          style: TextStyle(color: Color(0xFF66BB6A), fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(item.portion, style: const TextStyle(color: CLColors.muted, fontSize: 11)),
               ],
             ),

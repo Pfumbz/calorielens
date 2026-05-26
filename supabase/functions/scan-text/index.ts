@@ -101,9 +101,17 @@ INSTRUCTIONS:
 Respond ONLY in this exact JSON format (no markdown, no backticks):
 {"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<estimated size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}`
     } else {
-      prompt = `You are a professional nutritionist. Estimate the nutritional content for this meal description: "${description}"
+      prompt = `You are a professional nutritionist specialising in South African cuisine. Estimate the nutritional content for this meal description: "${description}"
+
+INSTRUCTIONS:
+1. Identify each food component mentioned.
+2. Use standard adult portion sizes unless the user specifies otherwise.
+3. For EACH item, estimate the weight in grams (weight_g). This is critical for accuracy.
+4. For EACH item, provide a "usda_query" — a simple, generic English food name for USDA database lookup (e.g. "rice white cooked", "chicken breast grilled").
+5. Round calories to the nearest 5. Be conservative.
+
 Respond ONLY in this exact JSON (no markdown):
-{"meal_name":"<short name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<size>","calories":<int>,"note":"<brief>"}],"overall_notes":"<2-3 sentences>"}`
+{"meal_name":"<short name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<size>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief>"}],"overall_notes":"<2-3 sentences>"}`
     }
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
