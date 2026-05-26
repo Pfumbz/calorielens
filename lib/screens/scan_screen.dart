@@ -11,6 +11,7 @@ import '../services/openfoodfacts_service.dart';
 import '../services/storage_service.dart';
 import '../theme.dart';
 import '../utils/error_helpers.dart';
+import '../widgets/analysis_loading.dart';
 import '../widgets/upgrade_modal.dart';
 
 
@@ -36,7 +37,7 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _picker = ImagePicker();
   final _textCtrl = TextEditingController();
   final _barcodeNameCtrl = TextEditingController();
@@ -326,9 +327,12 @@ class _ScanScreenState extends State<ScanScreen>
                   _buildPhotoArea(),
                 const SizedBox(height: 14),
                 if (_error != null && _scanMode != _ScanMode.barcode) _buildError(),
+                // Show premium loading animation while analysing
+                if (_loading && _scanMode != _ScanMode.barcode)
+                  const AnalysisLoadingWidget()
                 // Describe mode: always show Analyse button (greyed → active)
                 // Photo mode: show banner on landing, Analyse button when image selected
-                if (_scanMode == _ScanMode.text)
+                else if (_scanMode == _ScanMode.text)
                   _buildAnalyseBtn()
                 else if (_scanMode == _ScanMode.photo && _imageBytes != null)
                   _buildAnalyseBtn()
@@ -1279,7 +1283,7 @@ class _ScanScreenState extends State<ScanScreen>
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: (_loading || !canGo)
+          colors: !canGo
               ? [CLColors.muted2, CLColors.muted2]
               : [CLColors.accent, const Color(0xFFE8943A)],
         ),
@@ -1288,36 +1292,32 @@ class _ScanScreenState extends State<ScanScreen>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: (_loading || !canGo) ? null : _analyse,
+          onTap: !canGo ? null : _analyse,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-            child: _loading
-                ? const Center(
-                    child: SizedBox(width: 22, height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)))
-                : Row(
+            child: Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('ANALYSE MY MEAL',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(canGo ? 1 : 0.5),
-                                  fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.5,
-                                )),
-                            const SizedBox(height: 2),
-                            Text('Get calories, macros and insights',
-                                style: TextStyle(color: Colors.white.withOpacity(canGo ? 0.7 : 0.3), fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right, color: Colors.white.withOpacity(canGo ? 0.8 : 0.3), size: 24),
+                      Text('ANALYSE MY MEAL',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(canGo ? 1 : 0.5),
+                            fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.5,
+                          )),
+                      const SizedBox(height: 2),
+                      Text('Get calories, macros and insights',
+                          style: TextStyle(color: Colors.white.withOpacity(canGo ? 0.7 : 0.3), fontSize: 12)),
                     ],
                   ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.white.withOpacity(canGo ? 0.8 : 0.3), size: 24),
+              ],
+            ),
           ),
         ),
       ),
