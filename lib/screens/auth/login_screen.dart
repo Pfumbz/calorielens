@@ -589,7 +589,7 @@ class _LoginScreenState extends State<LoginScreen>
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: _loading ? null : _googleSignIn,
-        icon: const Text('G', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4285F4))),
+        icon: Image.asset('assets/google_g.png', width: 20, height: 20),
         label: const Text(
           'Continue with Google',
           style: TextStyle(color: CLColors.text, fontWeight: FontWeight.w600),
