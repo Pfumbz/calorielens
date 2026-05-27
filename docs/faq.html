@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CalNova - FAQ &amp; Support</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0C0B09;
+      color: #E8E0D0;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 8px; color: #F5EDE0; }
+    .brand { color: #D07830; font-style: italic; }
+    .subtitle { color: #8A8070; font-size: 14px; margin-bottom: 32px; }
+    h2 { font-size: 18px; color: #F5EDE0; margin-top: 32px; margin-bottom: 14px; border-bottom: 1px solid #2A2820; padding-bottom: 6px; }
+    .faq-item { margin-bottom: 22px; }
+    .faq-q {
+      font-size: 15px;
+      font-weight: 600;
+      color: #F5EDE0;
+      margin-bottom: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .faq-q::before {
+      content: "Q";
+      display: inline-block;
+      min-width: 22px;
+      height: 22px;
+      line-height: 22px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      background: #D07830;
+      color: #0C0B09;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+    .faq-a { color: #C8C0B0; font-size: 15px; margin-left: 30px; }
+    .faq-a p { margin-bottom: 8px; }
+    .faq-a ul { margin: 6px 0 10px 20px; }
+    .faq-a li { margin-bottom: 4px; font-size: 14px; color: #C8C0B0; }
+    .faq-a strong { color: #E8E0D0; }
+    a { color: #D07830; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .tip {
+      background: rgba(208, 120, 48, 0.08);
+      border-left: 3px solid #D07830;
+      padding: 10px 14px;
+      margin: 10px 0;
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      color: #C8C0B0;
+    }
+    .tip strong { color: #D07830; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #2A2820; color: #8A8070; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>FAQ &amp; Support</h1>
+    <p style="font-size: 20px; color: #F5EDE0;">Cal<span class="brand">Nova</span></p>
+    <p class="subtitle">Answers to common questions. Can&rsquo;t find what you need? Email us at <a href="mailto:makhuvhap.c@gmail.com">makhuvhap.c@gmail.com</a></p>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <h2>Getting Started</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">What is CalNova?</div>
+      <div class="faq-a">
+        <p>CalNova is an AI-powered nutrition tracker. Take a photo of your meal or describe it in words, and CalNova uses artificial intelligence combined with the USDA nutrition database to estimate calories, protein, carbs, fat, and fibre. It also includes an AI coach, personalised meal plans, and barcode scanning.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Do I need an account to use CalNova?</div>
+      <div class="faq-a">
+        <p>No. You can use CalNova as a guest with a limited number of free scans per day. However, creating a free account gives you more daily scans, cloud sync across devices, and access to features like the AI coach and meal plans.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Is CalNova free?</div>
+      <div class="faq-a">
+        <p>Yes, CalNova has a generous free tier. Free registered users get several AI meal scans and coach messages per day. CalNova Pro unlocks more scans, AI meal plans, Fridge Scanner, Weekly Progress Reports, and removes ads.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <h2>Scanning &amp; Accuracy</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">Why are my calorie estimates different from what I expected?</div>
+      <div class="faq-a">
+        <p>CalNova uses a two-step process: AI identifies the food items and estimates portion sizes, then cross-references with the USDA FoodData Central database for lab-verified nutrition data. However, accuracy depends on several factors:</p>
+        <ul>
+          <li><strong>Photo angle:</strong> A top-down photo doesn&rsquo;t show how deep a bowl is. Use the &ldquo;Add angle&rdquo; feature to take a second side-angle photo for better portion estimation.</li>
+          <li><strong>Portion visibility:</strong> Food hidden under sauce, stacked, or in opaque containers is harder to estimate.</li>
+          <li><strong>Preparation method:</strong> The same food can have very different calories depending on how it&rsquo;s prepared (fried vs. grilled, oil vs. dry).</li>
+          <li><strong>Regional dishes:</strong> Some traditional dishes may not have exact matches in the USDA database, so the AI provides its best estimate.</li>
+        </ul>
+        <div class="tip"><strong>Tip:</strong> For best results, spread food out on the plate so individual items are visible, and use the &ldquo;Add angle&rdquo; button to capture a side view of your meal.</div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What does the green &ldquo;USDA&rdquo; badge mean?</div>
+      <div class="faq-a">
+        <p>When you see a green &ldquo;USDA&rdquo; badge next to a food item in your scan results, it means the calorie and nutrition data for that item came from the USDA FoodData Central database &mdash; a collection of over 300,000 lab-verified foods. Items without the badge use the AI&rsquo;s own estimate, which is still reasonable but less precise.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What is the &ldquo;Add angle&rdquo; feature?</div>
+      <div class="faq-a">
+        <p>After taking your first photo (usually from above), CalNova lets you optionally add a second photo from a different angle &mdash; typically from the side. This helps the AI judge how deep bowls and containers are, leading to more accurate portion weight estimates. It&rsquo;s completely optional but recommended for meals in bowls, cups, or deep plates.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I fix a scan if the AI got something wrong?</div>
+      <div class="faq-a">
+        <p>Yes. After a scan, tap the &ldquo;Correct&rdquo; button to tell CalNova what the meal actually was. The AI will re-analyse using your corrected description and adjust the nutrition proportionally. Corrections don&rsquo;t count against your daily scan limit.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How does barcode scanning work?</div>
+      <div class="faq-a">
+        <p>CalNova looks up the barcode in the Open Food Facts database, which contains nutrition data for millions of packaged products worldwide. If the product is found, you&rsquo;ll see its nutrition information with a serving size picker. If the product isn&rsquo;t in the database, CalNova falls back to AI estimation using the product name.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I&rsquo;ve used all my free scans. What can I do?</div>
+      <div class="faq-a">
+        <p>Your daily scan limit resets at midnight. If you need more scans right away, upgrading to CalNova Pro significantly increases your daily allowance. You can also use the &ldquo;Describe&rdquo; tab to type your meal as text, which uses the same daily limit but is useful if you don&rsquo;t have a photo.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <h2>Health Connect &amp; Fitness Watch</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">What is Health Connect and why does CalNova use it?</div>
+      <div class="faq-a">
+        <p>Health Connect is Android&rsquo;s central health data hub. When enabled, CalNova reads your daily step count and active calories burned from Health Connect, and can optionally adjust your calorie goal to account for exercise. All health data stays on your device &mdash; it is never sent to our servers.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Health Connect isn&rsquo;t showing on my phone. What do I do?</div>
+      <div class="faq-a">
+        <p>Health Connect availability depends on your Android version:</p>
+        <ul>
+          <li><strong>Android 14+:</strong> Health Connect is built in. Go to Settings &rarr; Health Connect to manage permissions.</li>
+          <li><strong>Android 13:</strong> Health Connect should be pre-installed but may need an update from the Play Store. Search for &ldquo;Health Connect by Android&rdquo; in the Play Store.</li>
+          <li><strong>Android 9&ndash;12:</strong> You need to install <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata">Health Connect from the Play Store</a> manually. Note that on older versions, some features may be limited.</li>
+          <li><strong>Below Android 9:</strong> Health Connect is not supported.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">My fitness watch data isn&rsquo;t appearing in CalNova. How do I fix this?</div>
+      <div class="faq-a">
+        <p>CalNova reads from Health Connect, not directly from your watch. Your watch&rsquo;s companion app needs to sync data to Health Connect first. Here&rsquo;s the chain:</p>
+        <p><strong>Watch &rarr; Watch&rsquo;s companion app &rarr; Health Connect &rarr; CalNova</strong></p>
+        <p>Steps to troubleshoot:</p>
+        <ul>
+          <li><strong>Step 1:</strong> Open your watch&rsquo;s companion app (e.g. Garmin Connect, Samsung Health, Fitbit, Huawei Health) and make sure it has synced recently. Some apps don&rsquo;t sync automatically in the background &mdash; you may need to open the app and wait for it to refresh.</li>
+          <li><strong>Step 2:</strong> Check that your companion app has Health Connect integration enabled. Look in the app&rsquo;s settings for &ldquo;Health Connect,&rdquo; &ldquo;Connected apps,&rdquo; or &ldquo;Data sharing.&rdquo;</li>
+          <li><strong>Step 3:</strong> Open Health Connect on your phone (Settings &rarr; Health Connect, or search for it) and verify that your companion app has permission to write steps and calories.</li>
+          <li><strong>Step 4:</strong> In CalNova, go to Settings &rarr; Health Connect and tap the refresh button, or pull down on the Today screen to refresh.</li>
+        </ul>
+        <div class="tip"><strong>Garmin users:</strong> Garmin Connect does not always sync automatically in the background. You may need to open the Garmin Connect app manually each day for your data to flow through to Health Connect and then to CalNova.</div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">My watch app doesn&rsquo;t support Health Connect directly. What can I do?</div>
+      <div class="faq-a">
+        <p>Some older watch companion apps don&rsquo;t have built-in Health Connect support. In this case, you can use a bridge app like <a href="https://play.google.com/store/apps/details?id=nl.appyhapps.healthsync">Health Sync</a> (available on the Play Store) to transfer data from your watch app to Health Connect. The flow becomes:</p>
+        <p><strong>Watch &rarr; Watch app &rarr; Health Sync &rarr; Health Connect &rarr; CalNova</strong></p>
+        <div class="tip"><strong>Note:</strong> Health Sync is a third-party app not affiliated with CalNova. It may require a one-time purchase. Check the app&rsquo;s compatibility list to confirm it supports your watch brand.</div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">CalNova shows 0 steps even though I&rsquo;ve been walking. Why?</div>
+      <div class="faq-a">
+        <p>This usually means the data hasn&rsquo;t made it through the sync chain yet. Try these steps in order:</p>
+        <ul>
+          <li>Open your watch&rsquo;s companion app and wait for it to sync</li>
+          <li>Open Health Connect and check if step data appears there for today</li>
+          <li>In CalNova, pull down on the Today screen to force a refresh</li>
+        </ul>
+        <p>If Health Connect itself shows 0 steps, the issue is between your watch app and Health Connect, not CalNova. Check your companion app&rsquo;s Health Connect permissions.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I disconnect Health Connect from CalNova?</div>
+      <div class="faq-a">
+        <p>Yes. Go to CalNova Settings &rarr; Health Connect and toggle it off. CalNova will stop reading health data immediately. No health data is retained after disconnection &mdash; it was never stored on our servers in the first place.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <h2>CalNova Pro &amp; Subscriptions</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">What does CalNova Pro include?</div>
+      <div class="faq-a">
+        <p>CalNova Pro gives you:</p>
+        <ul>
+          <li>Significantly more daily AI meal scans</li>
+          <li>AI-generated personalised meal plans with shopping lists</li>
+          <li>Fridge Scanner &mdash; photograph your fridge and get recipe suggestions</li>
+          <li>AI Smart Coach with unlimited chat history</li>
+          <li>Weekly Progress Reports with nutrition scoring</li>
+          <li>Ad-free experience</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I cancel my subscription?</div>
+      <div class="faq-a">
+        <p>CalNova Pro is billed through Google Play. To cancel:</p>
+        <ul>
+          <li>Open the <strong>Google Play Store</strong> app on your phone</li>
+          <li>Tap your profile icon (top right) &rarr; <strong>Payments &amp; subscriptions</strong> &rarr; <strong>Subscriptions</strong></li>
+          <li>Find <strong>CalNova</strong> and tap <strong>Cancel subscription</strong></li>
+        </ul>
+        <p>You&rsquo;ll keep Pro access until the end of your current billing period. You can also access this from CalNova &rarr; Settings &rarr; &ldquo;Manage subscription.&rdquo;</p>
+        <div class="tip"><strong>Note:</strong> Uninstalling the app does <em>not</em> cancel your subscription. You must cancel through Google Play.</div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I get a refund?</div>
+      <div class="faq-a">
+        <p>Refunds are processed through Google Play:</p>
+        <ul>
+          <li><strong>Within 48 hours of purchase:</strong> You can request a refund directly in the Google Play Store under your purchase history.</li>
+          <li><strong>After 48 hours:</strong> Visit <a href="https://support.google.com/googleplay/answer/2479637">Google Play&rsquo;s refund support page</a> to submit a request.</li>
+        </ul>
+        <p>If you experience a technical issue preventing you from using Pro features, contact us at <a href="mailto:makhuvhap.c@gmail.com">makhuvhap.c@gmail.com</a> and we&rsquo;ll help resolve it.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I subscribed but I&rsquo;m not seeing Pro features. What do I do?</div>
+      <div class="faq-a">
+        <p>Try these steps:</p>
+        <ul>
+          <li>Go to CalNova Settings and tap <strong>&ldquo;Restore purchases&rdquo;</strong></li>
+          <li>Make sure you&rsquo;re signed in with the same Google account that made the purchase</li>
+          <li>Close and reopen the app</li>
+          <li>Check your Google Play subscriptions to confirm the subscription is active</li>
+        </ul>
+        <p>If the issue persists, email us at <a href="mailto:makhuvhap.c@gmail.com">makhuvhap.c@gmail.com</a> with your account email and we&rsquo;ll investigate.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <h2>Account &amp; Data</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I delete my account?</div>
+      <div class="faq-a">
+        <p>To delete your CalNova account and all associated data, visit our <a href="https://pfumbz.github.io/calorielens/delete-account.html">account deletion page</a> or email us at <a href="mailto:makhuvhap.c@gmail.com">makhuvhap.c@gmail.com</a> with the subject &ldquo;Delete my account.&rdquo; All your data (profile, diary entries, usage history) will be permanently removed from our servers within 30 days.</p>
+        <div class="tip"><strong>Important:</strong> If you have an active CalNova Pro subscription, cancel it through Google Play <em>before</em> deleting your account to avoid continued billing.</div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Is my data synced across devices?</div>
+      <div class="faq-a">
+        <p>Yes, if you&rsquo;re signed in. Your diary entries, profile, and calorie goal sync to the cloud automatically. Sign in on a new device with the same account and your data will appear. Guest users (not signed in) have local-only storage &mdash; data exists only on that device.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I signed in but my old diary entries are missing. Where are they?</div>
+      <div class="faq-a">
+        <p>If you previously used CalNova as a guest and then created an account, your guest data should have been migrated automatically on first sign-in. If entries are missing, it&rsquo;s possible the migration occurred on a different device. Unfortunately, guest data that wasn&rsquo;t migrated cannot be recovered as it was stored locally only.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <h2>Troubleshooting</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">The app briefly closes and reopens when I take a photo. Is this normal?</div>
+      <div class="faq-a">
+        <p>This can happen on some Android devices, especially those with limited RAM. When the camera opens, Android may temporarily close CalNova to free up memory. When the camera finishes, CalNova restores itself and recovers your captured photo automatically. Your photo is not lost &mdash; you&rsquo;ll see it ready to analyse when the app returns.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">My scan is taking a long time. Is something wrong?</div>
+      <div class="faq-a">
+        <p>A typical scan takes 5&ndash;15 seconds depending on your internet connection. If you&rsquo;re using the multi-angle feature (two photos), it may take slightly longer. If a scan seems stuck for more than 30 seconds, check your internet connection and try again. The app will show an error message if the scan fails.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I&rsquo;m getting &ldquo;Camera access denied.&rdquo; How do I fix this?</div>
+      <div class="faq-a">
+        <p>CalNova needs camera permission to scan meals. To grant it:</p>
+        <ul>
+          <li>Go to your phone&rsquo;s <strong>Settings &rarr; Apps &rarr; CalNova &rarr; Permissions</strong></li>
+          <li>Enable <strong>Camera</strong> permission</li>
+          <li>If you also want to use voice input, enable <strong>Microphone</strong> permission</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">The AI Coach gave me advice I&rsquo;m not sure about. Should I follow it?</div>
+      <div class="faq-a">
+        <p>CalNova&rsquo;s AI Coach provides general wellness suggestions based on your logged meals and profile. It is <strong>not a substitute for professional medical or dietary advice</strong>. If you have specific health conditions, allergies, or dietary requirements, always consult a qualified healthcare professional or registered dietitian before making changes to your diet.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <h2>Still Need Help?</h2>
+    <p>If your question isn&rsquo;t answered above, we&rsquo;re happy to help. Email us at <a href="mailto:makhuvhap.c@gmail.com">makhuvhap.c@gmail.com</a> and we&rsquo;ll get back to you as soon as possible.</p>
+
+    <div class="footer">
+      <p>&copy; 2026 PC Mac Studios. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

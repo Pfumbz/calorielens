@@ -1262,6 +1262,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'https://pfumbz.github.io/calorielens/privacy-policy.html';
   static const _termsOfServiceUrl =
       'https://pfumbz.github.io/calorielens/terms-of-service.html';
+  static const _faqUrl =
+      'https://pfumbz.github.io/calorielens/faq.html';
 
   Widget _buildAboutSection() {
     return Container(
@@ -1286,6 +1288,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: 'Terms of Service',
             labelColor: CLColors.text,
             onTap: () => launchUrl(Uri.parse(_termsOfServiceUrl),
+                mode: LaunchMode.externalApplication),
+          ),
+          const Divider(color: CLColors.border, height: 1),
+          _tappableRow(
+            icon: Icons.help_outline,
+            label: 'FAQ & Support',
+            labelColor: CLColors.text,
+            onTap: () => launchUrl(Uri.parse(_faqUrl),
                 mode: LaunchMode.externalApplication),
           ),
           const Divider(color: CLColors.border, height: 1),
