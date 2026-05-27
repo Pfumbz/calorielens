@@ -68,8 +68,9 @@ serve(async (req) => {
       )
     }
 
-    // Parse request body
-    const { imageBase64, mediaType } = await req.json()
+    // Parse request body (supports optional second image for multi-angle)
+    const body = await req.json()
+    const { imageBase64, mediaType, imageBase64_2, mediaType_2 } = body
     if (!imageBase64 || !mediaType) {
       return new Response(JSON.stringify({ error: 'Missing imageBase64 or mediaType' }), {
         status: 400,
@@ -77,7 +78,7 @@ serve(async (req) => {
       })
     }
 
-    // Validate image size (base64 is ~4/3 of raw bytes)
+    // Validate image size(s) (base64 is ~4/3 of raw bytes)
     const estimatedBytes = Math.ceil(imageBase64.length * 3 / 4)
     if (estimatedBytes > MAX_IMAGE_BYTES) {
       return new Response(
@@ -85,8 +86,17 @@ serve(async (req) => {
         { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    if (imageBase64_2) {
+      const estimatedBytes2 = Math.ceil(imageBase64_2.length * 3 / 4)
+      if (estimatedBytes2 > MAX_IMAGE_BYTES) {
+        return new Response(
+          JSON.stringify({ error: 'Second image is too large. Please use a smaller photo (max 10 MB).' }),
+          { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
 
-    // Validate media type
+    // Validate media type(s)
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (!allowedTypes.includes(mediaType)) {
       return new Response(
@@ -95,11 +105,13 @@ serve(async (req) => {
       )
     }
 
+    const hasSecondImage = imageBase64_2 && mediaType_2
+
     // Call Anthropic API (key stored securely in Supabase vault)
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not set in environment')
 
-    const prompt = `You are an expert nutritionist specialising in South African cuisine. Analyse this meal photo and estimate its nutritional content.
+    const promptSingle = `You are an expert nutritionist specialising in South African cuisine. Analyse this meal photo and estimate its nutritional content.
 
 INSTRUCTIONS:
 1. Identify every distinct food item visible in the photo. Look carefully — don't miss sides, sauces, or drinks.
@@ -114,6 +126,38 @@ INSTRUCTIONS:
 Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
 {"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
 
+    const promptMulti = `You are an expert nutritionist specialising in South African cuisine. You are given TWO photos of the SAME meal taken from different angles. Use BOTH images together to accurately identify food items and estimate portion sizes.
+
+INSTRUCTIONS:
+1. The first image is typically a top-down view. The second image shows a different angle (side, 45°, etc.) revealing depth and volume that the top view cannot show.
+2. Cross-reference both images: use the top view to identify foods and the side/angle view to gauge how deep or tall portions are — bowls, cups, and plates often hold much more than they appear from above.
+3. For EACH item, estimate the weight in grams (weight_g). Use BOTH angles to judge volume accurately. This is critical — the second angle exists specifically to improve your weight estimate.
+4. For EACH item, provide a "usda_query" — a simple, generic English food name suitable for searching the USDA database (e.g. "rice white cooked", "chicken breast grilled", "cheddar cheese"). Avoid brand names.
+5. For South African dishes (e.g. pap, chakalaka, bunny chow, boerewors, vetkoek, samp & beans, mogodu, morogo), use nutrition data specific to those foods — do NOT substitute with generic Western equivalents.
+6. When uncertain about a food item, name your best guess and note the uncertainty in that item's "note" field.
+7. Round calories to the nearest 5. Be conservative rather than over-estimating.
+8. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
+
+Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
+
+    const prompt = hasSecondImage ? promptMulti : promptSingle
+
+    // Build content array — one or two images followed by prompt
+    const contentArray: Array<Record<string, unknown>> = [
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: mediaType, data: imageBase64 },
+      },
+    ]
+    if (hasSecondImage) {
+      contentArray.push({
+        type: 'image',
+        source: { type: 'base64', media_type: mediaType_2, data: imageBase64_2 },
+      })
+    }
+    contentArray.push({ type: 'text', text: prompt })
+
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -126,13 +170,7 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
         max_tokens: 1024,
         messages: [{
           role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: imageBase64 },
-            },
-            { type: 'text', text: prompt },
-          ],
+          content: contentArray,
         }],
       }),
     })

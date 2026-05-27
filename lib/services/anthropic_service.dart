@@ -20,8 +20,8 @@ class AnthropicService {
         'anthropic-dangerous-direct-browser-access': 'true',
       };
 
-  // ── Image scan prompt ─────────────────────────────────────────────
-  static const _imageScanPrompt = '''You are an expert nutritionist specialising in South African cuisine. Analyse this meal photo and estimate its nutritional content.
+  // ── Image scan prompts ────────────────────────────────────────────
+  static const _imageScanPromptSingle = '''You are an expert nutritionist specialising in South African cuisine. Analyse this meal photo and estimate its nutritional content.
 
 INSTRUCTIONS:
 1. Identify every distinct food item visible in the photo. Look carefully — don't miss sides, sauces, or drinks.
@@ -36,41 +36,60 @@ INSTRUCTIONS:
 Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
 {"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}''';
 
-  // ── Scan image ───────────────────────────────────────────────────
+  static const _imageScanPromptMulti = '''You are an expert nutritionist specialising in South African cuisine. You are given TWO photos of the SAME meal taken from different angles. Use BOTH images together to accurately identify food items and estimate portion sizes.
+
+INSTRUCTIONS:
+1. The first image is typically a top-down view. The second image shows a different angle (side, 45°, etc.) revealing depth and volume that the top view cannot show.
+2. Cross-reference both images: use the top view to identify foods and the side/angle view to gauge how deep or tall portions are — bowls, cups, and plates often hold much more than they appear from above.
+3. For EACH item, estimate the weight in grams (weight_g). Use BOTH angles to judge volume accurately. This is critical — the second angle exists specifically to improve your weight estimate.
+4. For EACH item, provide a "usda_query" — a simple, generic English food name suitable for searching the USDA database (e.g. "rice white cooked", "chicken breast grilled", "cheddar cheese"). Avoid brand names.
+5. For South African dishes (e.g. pap, chakalaka, bunny chow, boerewors, vetkoek, samp & beans, mogodu, morogo), use nutrition data specific to those foods — do NOT substitute with generic Western equivalents.
+6. When uncertain about a food item, name your best guess and note the uncertainty in that item's "note" field.
+7. Round calories to the nearest 5. Be conservative rather than over-estimating.
+8. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
+
+Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}''';
+
+  // ── Scan image (single or multi-angle) ──────────────────────────
   Future<ScanResult> scanImage(Uint8List imageBytes, String mediaType) async {
-    final (result, _) = await scanImageWithRaw(imageBytes, mediaType);
+    final (result, _) = await scanImageWithRaw([imageBytes], [mediaType]);
     return result;
   }
 
-  /// Scan image and return both the ScanResult and raw JSON (for USDA query extraction).
+  /// Scan one or more images and return both the ScanResult and raw JSON.
+  /// Supports multi-angle: pass two images for better portion depth estimation.
   Future<(ScanResult, Map<String, dynamic>)> scanImageWithRaw(
-    Uint8List imageBytes,
-    String mediaType,
+    List<Uint8List> imageBytesList,
+    List<String> mediaTypes,
   ) async {
-    final b64 = base64Encode(imageBytes);
+    final isMulti = imageBytesList.length > 1;
+    final prompt = isMulti ? _imageScanPromptMulti : _imageScanPromptSingle;
+
+    // Build content array: images first, then prompt text
+    final content = <Map<String, dynamic>>[];
+    for (int i = 0; i < imageBytesList.length; i++) {
+      content.add({
+        'type': 'image',
+        'source': {
+          'type': 'base64',
+          'media_type': mediaTypes[i],
+          'data': base64Encode(imageBytesList[i]),
+        }
+      });
+    }
+    content.add({'type': 'text', 'text': prompt});
+
     final body = jsonEncode({
       'model': _modelVision,
       'max_tokens': 1024,
       'messages': [
-        {
-          'role': 'user',
-          'content': [
-            {
-              'type': 'image',
-              'source': {
-                'type': 'base64',
-                'media_type': mediaType,
-                'data': b64,
-              }
-            },
-            {'type': 'text', 'text': _imageScanPrompt}
-          ]
-        }
+        {'role': 'user', 'content': content}
       ]
     });
 
     final res = await http.post(Uri.parse(_endpoint), headers: _headers, body: body)
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 45)); // Slightly longer for multi-image
     return _parseResponseWithRaw(res);
   }
 

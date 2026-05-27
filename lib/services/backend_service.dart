@@ -35,29 +35,46 @@ class BackendService {
     };
   }
 
-  // ── Scan image ───────────────────────────────────────────────────────────
-  Future<ScanResult> scanImage(Uint8List imageBytes, String mediaType) async {
+  // ── Scan image (supports multi-angle) ────────────────────────────────────
+  /// Pass a single image or multiple images for multi-angle scanning.
+  /// When two images are provided, the AI uses both angles for better
+  /// portion depth estimation.
+  Future<ScanResult> scanImage(
+    Uint8List imageBytes,
+    String mediaType, {
+    Uint8List? secondImageBytes,
+    String? secondMediaType,
+  }) async {
     ScanResult aiResult;
     Map<String, dynamic>? rawJson;
 
+    final imageList = [imageBytes, if (secondImageBytes != null) secondImageBytes];
+    final mediaList = [mediaType, if (secondMediaType != null) secondMediaType];
+
     if (_useByok) {
-      final (result, raw) = await AnthropicService(byokApiKey!).scanImageWithRaw(imageBytes, mediaType);
+      final (result, raw) = await AnthropicService(byokApiKey!).scanImageWithRaw(imageList, mediaList);
       aiResult = result;
       rawJson = raw;
     } else {
       _requireSignIn();
 
+      // Build payload — supports 1 or 2 images
+      final payload = <String, dynamic>{
+        'imageBase64': base64Encode(imageBytes),
+        'mediaType': mediaType,
+      };
+      if (secondImageBytes != null) {
+        payload['imageBase64_2'] = base64Encode(secondImageBytes);
+        payload['mediaType_2'] = secondMediaType ?? 'image/jpeg';
+      }
+
       final res = await http.post(
         Uri.parse('$_functionsBaseUrl/scan-image'),
         headers: _authHeaders,
-        body: jsonEncode({
-          'imageBase64': base64Encode(imageBytes),
-          'mediaType': mediaType,
-        }),
-      ).timeout(const Duration(seconds: 30));
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 45));
 
       aiResult = _parseScanResponse(res);
-      // Parse raw JSON to extract usda_query fields
       try {
         rawJson = jsonDecode(res.body) as Map<String, dynamic>;
       } catch (_) {}

@@ -44,6 +44,8 @@ class _ScanScreenState extends State<ScanScreen>
 
   Uint8List? _imageBytes;
   String _mediaType = 'image/jpeg';
+  Uint8List? _secondImageBytes;   // Optional second angle photo
+  String _secondMediaType = 'image/jpeg';
   _ScanMode _scanMode = _ScanMode.photo;
   bool _loading = false;
   String? _error;
@@ -109,9 +111,9 @@ class _ScanScreenState extends State<ScanScreen>
     try {
       final img = await _picker.pickImage(
         source: source,
-        imageQuality: 80,
-        maxWidth: 1600,
-        maxHeight: 1600,
+        imageQuality: 70,
+        maxWidth: 1200,
+        maxHeight: 1200,
       );
       if (img == null) return;
       final bytes = await img.readAsBytes();
@@ -142,6 +144,27 @@ class _ScanScreenState extends State<ScanScreen>
       } else {
         await _recoverLostImage();
       }
+    }
+  }
+
+  /// Pick a second angle photo for better portion depth estimation.
+  Future<void> _pickSecondImage(ImageSource source) async {
+    try {
+      final img = await _picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
+      if (img == null) return;
+      final bytes = await img.readAsBytes();
+      final ext = img.path.toLowerCase();
+      setState(() {
+        _secondImageBytes = bytes;
+        _secondMediaType = ext.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      });
+    } catch (e) {
+      debugPrint('Second image pick error: $e');
     }
   }
 
@@ -183,7 +206,11 @@ class _ScanScreenState extends State<ScanScreen>
         res = await svc.scanText(desc);
       } else {
         if (_imageBytes == null) throw Exception('Select an image first.');
-        res = await svc.scanImage(_imageBytes!, _mediaType);
+        res = await svc.scanImage(
+          _imageBytes!, _mediaType,
+          secondImageBytes: _secondImageBytes,
+          secondMediaType: _secondImageBytes != null ? _secondMediaType : null,
+        );
       }
       await state.trackScan();
       setState(() { _result = res; _updateResultFlag(); });
@@ -237,6 +264,7 @@ class _ScanScreenState extends State<ScanScreen>
       setState(() {
         _result = null;
         _imageBytes = null;
+        _secondImageBytes = null;
         _error = null;
         _textCtrl.clear();
         _barcodeScanned = false;
@@ -265,6 +293,7 @@ class _ScanScreenState extends State<ScanScreen>
     setState(() {
       _result = null;
       _imageBytes = null;
+      _secondImageBytes = null;
       _error = null;
       _textCtrl.clear();
       _barcodeScanned = false;
@@ -587,55 +616,159 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   Widget _buildImagePreview() {
-    return Container(
-      height: 300,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: CLColors.accent.withOpacity(0.5), width: 1.5),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(19),
-            child: Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity),
+    return Column(
+      children: [
+        Container(
+          height: 300,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: CLColors.accent.withOpacity(0.5), width: 1.5),
           ),
-          Positioned(
-            top: 10, right: 10,
-            child: GestureDetector(
-              onTap: () => setState(() {
-                _imageBytes = null;
-                _result = null;
-                _error = null;
-              }),
-              child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                child: const Icon(Icons.close, color: Colors.white, size: 18),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(19),
+                child: Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity),
               ),
-            ),
-          ),
-          Positioned(
-            bottom: 12, right: 14,
-            child: GestureDetector(
-              onTap: _showImageSourceOptions,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black54, borderRadius: BorderRadius.circular(20),
+              // Close button
+              Positioned(
+                top: 10, right: 10,
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    _imageBytes = null;
+                    _secondImageBytes = null;
+                    _result = null;
+                    _error = null;
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                    child: const Icon(Icons.close, color: Colors.white, size: 18),
+                  ),
                 ),
-                child: const Row(
+              ),
+              // Retake button
+              Positioned(
+                bottom: 12, right: 14,
+                child: GestureDetector(
+                  onTap: _showImageSourceOptions,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54, borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh, color: Colors.white, size: 13),
+                        SizedBox(width: 5),
+                        Text('Retake', style: TextStyle(color: Colors.white, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Second image thumbnail (if present)
+              if (_secondImageBytes != null)
+                Positioned(
+                  bottom: 12, left: 14,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _secondImageBytes = null),
+                    child: Container(
+                      width: 56, height: 56,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: CLColors.accent, width: 1.5),
+                        boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 6)],
+                      ),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(9),
+                            child: Image.memory(_secondImageBytes!, fit: BoxFit.cover, width: 56, height: 56),
+                          ),
+                          Positioned(
+                            top: -2, right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
+                              child: const Icon(Icons.close, color: Colors.white, size: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // "+ Add angle" button (only if no second image yet)
+        if (_secondImageBytes == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: GestureDetector(
+              onTap: () => _showSecondImageOptions(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: CLColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: CLColors.border),
+                ),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.refresh, color: Colors.white, size: 13),
-                    SizedBox(width: 5),
-                    Text('Retake', style: TextStyle(color: Colors.white, fontSize: 12)),
+                    Icon(Icons.add_a_photo_outlined, color: CLColors.muted, size: 15),
+                    const SizedBox(width: 6),
+                    const Text('Add angle for better accuracy',
+                        style: TextStyle(color: CLColors.muted, fontSize: 12)),
                   ],
                 ),
               ),
             ),
           ),
-        ],
+      ],
+    );
+  }
+
+  void _showSecondImageOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: CLColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4,
+                decoration: BoxDecoration(color: CLColors.border, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Add a side-angle photo to help estimate portion depth',
+                style: TextStyle(color: CLColors.muted, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: CLColors.accent),
+              title: const Text('Take Photo', style: TextStyle(color: CLColors.text)),
+              onTap: () { Navigator.pop(context); _pickSecondImage(ImageSource.camera); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: CLColors.accent),
+              title: const Text('Choose from Gallery', style: TextStyle(color: CLColors.text)),
+              onTap: () { Navigator.pop(context); _pickSecondImage(ImageSource.gallery); },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
