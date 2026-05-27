@@ -105,16 +105,27 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (result.success) {
         if (result.user == null) {
-          // Email confirmation is enabled — user must verify before signing in.
-          // Note: Supabase returns the same response for new AND existing users
-          // (security feature to prevent email enumeration), so we phrase the
-          // message to work in both cases.
+          // Email confirmation enabled + brand-new user → verification email sent
           setState(() {
-            _infoMsg = 'Check your email for a verification link to sign in. '
-                'If you already have an account, try signing in below or use "Forgot password?" to reset it.';
-            _isSignUp = false; // Switch to sign-in mode
+            _infoMsg = 'We\'ve sent a verification link to your email. '
+                'Check your inbox (and spam folder), then come back to sign in.';
+            _isSignUp = false;
             _pwCtrl.clear();
             _errorType = null;
+          });
+        } else if (result.user!.identities == null ||
+            result.user!.identities!.isEmpty) {
+          // Email confirmation enabled + email already taken → Supabase returns
+          // a user with NO identities (security: prevents email enumeration).
+          // The user will never receive a confirmation email, so we must tell
+          // them the account already exists and offer sign-in / password reset.
+          setState(() {
+            _errorMsg =
+                'An account with this email already exists. '
+                'Sign in with your existing credentials, or reset your password if you\'ve forgotten it.';
+            _errorType = _ErrorType.alreadyRegistered;
+            _isSignUp = false;
+            _pwCtrl.clear();
           });
         } else {
           // Email confirmation is disabled — user is signed in immediately.
@@ -453,7 +464,18 @@ class _LoginScreenState extends State<LoginScreen>
               _pwCtrl.clear();
             });
           }),
-          _errorActionChip('Continue with Google', _googleSignIn),
+          _errorActionChip('Reset password', () async {
+            final email = _emailCtrl.text.trim();
+            if (email.isEmpty) return;
+            setState(() { _loading = true; _errorMsg = null; _errorType = null; });
+            await AuthService.sendPasswordReset(email);
+            if (mounted) {
+              setState(() {
+                _loading = false;
+                _infoMsg = 'Password reset email sent. Check your inbox.';
+              });
+            }
+          }),
         ];
       case _ErrorType.rateLimit:
         return [
