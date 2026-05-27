@@ -7,8 +7,11 @@ class AuthResult {
   final bool success;
   final String? error;
   final User? user;
+  /// True when a session was created (user is signed in). False when email
+  /// confirmation is still pending or the operation failed.
+  final bool signedIn;
 
-  AuthResult({required this.success, this.error, this.user});
+  AuthResult({required this.success, this.error, this.user, this.signedIn = false});
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -44,14 +47,11 @@ class AuthService {
       // So we check session to know if the user is actually signed in.
       if (res.session != null) {
         // Email confirmation disabled — user is signed in immediately
-        return AuthResult(success: true, user: res.user);
+        return AuthResult(success: true, user: res.user, signedIn: true);
       }
-      // Email confirmation required — user created but not signed in
-      return AuthResult(
-        success: true,
-        user: null,
-        error: 'Check your email for a confirmation link.',
-      );
+      // Email confirmation required — pass user through so the UI can
+      // inspect identities (empty list = email already taken by another provider).
+      return AuthResult(success: true, user: res.user);
     } on AuthException catch (e) {
       return AuthResult(success: false, error: _friendlyError(e.message));
     } catch (e) {
@@ -68,7 +68,7 @@ class AuthService {
         email: email,
         password: password,
       );
-      return AuthResult(success: true, user: res.user);
+      return AuthResult(success: true, user: res.user, signedIn: true);
     } on AuthException catch (e) {
       return AuthResult(success: false, error: _friendlyError(e.message));
     } catch (e) {
@@ -106,7 +106,7 @@ class AuthService {
         accessToken: accessToken,
       );
 
-      return AuthResult(success: true, user: res.user);
+      return AuthResult(success: true, user: res.user, signedIn: true);
     } on AuthException catch (e) {
       return AuthResult(success: false, error: _friendlyError(e.message));
     } catch (e) {

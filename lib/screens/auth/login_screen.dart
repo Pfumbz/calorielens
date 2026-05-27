@@ -104,21 +104,12 @@ class _LoginScreenState extends State<LoginScreen>
       setState(() => _loading = false);
 
       if (result.success) {
-        if (result.user == null) {
-          // Email confirmation enabled + brand-new user → verification email sent
-          setState(() {
-            _infoMsg = 'We\'ve sent a verification link to your email. '
-                'Check your inbox (and spam folder), then come back to sign in.';
-            _isSignUp = false;
-            _pwCtrl.clear();
-            _errorType = null;
-          });
-        } else if (result.user!.identities == null ||
-            result.user!.identities!.isEmpty) {
-          // Email confirmation enabled + email already taken → Supabase returns
-          // a user with NO identities (security: prevents email enumeration).
-          // The user will never receive a confirmation email, so we must tell
-          // them the account already exists and offer sign-in / password reset.
+        final identities = result.user?.identities;
+
+        if (identities != null && identities.isEmpty) {
+          // Email already taken → Supabase returns a user with NO identities
+          // (security: prevents email enumeration). The user will never
+          // receive a confirmation email, so show a clear error.
           setState(() {
             _errorMsg =
                 'An account with this email already exists. '
@@ -127,8 +118,8 @@ class _LoginScreenState extends State<LoginScreen>
             _isSignUp = false;
             _pwCtrl.clear();
           });
-        } else {
-          // Email confirmation is disabled — user is signed in immediately.
+        } else if (result.signedIn) {
+          // Email confirmation disabled — user is signed in immediately.
           setState(() {
             _infoMsg = 'Account created! Your meals will now sync.';
           });
@@ -140,6 +131,15 @@ class _LoginScreenState extends State<LoginScreen>
             await Future.delayed(const Duration(milliseconds: 800));
             if (mounted) Navigator.of(context).pop();
           }
+        } else {
+          // New user, email confirmation required → verification email sent
+          setState(() {
+            _infoMsg = 'We\'ve sent a verification link to your email. '
+                'Check your inbox (and spam folder), then come back to sign in.';
+            _isSignUp = false;
+            _pwCtrl.clear();
+            _errorType = null;
+          });
         }
       } else {
         // Determine error type for contextual actions
