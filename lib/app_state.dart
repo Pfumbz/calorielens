@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'models/models.dart';
@@ -34,6 +35,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   double _activityMultiplier = 0.6;
   int _stepsToday = 0;
   int _activeCaloriesToday = 0;
+
+  /// Periodic timer — refreshes Health Connect data every 15 minutes
+  /// while the app is in the foreground.
+  Timer? _healthRefreshTimer;
 
   // ── Meal plan state ───────────────────────────────────────────────────
   List<String> _savedPlanIds = [];
@@ -178,9 +183,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       await _refreshFromCloud();
     }
 
-    // Refresh health data if enabled
+    // Refresh health data if enabled and start periodic timer
     if (_healthEnabled) {
       unawaited(_refreshHealthData());
+      _startHealthTimer();
     }
 
     // Initialise in-app purchases and listen for subscription changes
@@ -208,6 +214,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _healthRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -221,8 +228,26 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _startHealthTimer();
       _onAppResumed();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _stopHealthTimer();
     }
+  }
+
+  void _startHealthTimer() {
+    if (!_healthEnabled) return;
+    _healthRefreshTimer?.cancel();
+    _healthRefreshTimer = Timer.periodic(
+      const Duration(minutes: 15),
+      (_) => _refreshHealthData(),
+    );
+  }
+
+  void _stopHealthTimer() {
+    _healthRefreshTimer?.cancel();
+    _healthRefreshTimer = null;
   }
 
   /// Called when the app returns to the foreground.
@@ -515,7 +540,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _healthEnabled = enabled;
     if (enabled) {
       await _refreshHealthData();
+      _startHealthTimer();
     } else {
+      _stopHealthTimer();
       _stepsToday = 0;
       _activeCaloriesToday = 0;
       _health.resetDaily();
