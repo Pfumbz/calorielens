@@ -98,7 +98,7 @@ const html = `<!DOCTYPE html>
 
     <h2>10. Contact Us</h2>
     <p>If you have any questions about this Privacy Policy or your data, please contact us at:</p>
-    <p><a href="mailto:makhuvhap.c@gmail.com">makhuvhap.c@gmail.com</a></p>
+    <p><a href="mailto:pcmacstudios@gmail.com">pcmacstudios@gmail.com</a></p>
 
     <div class="footer">
       <p>&copy; 2026 PC Mac Studios. All rights reserved.</p>

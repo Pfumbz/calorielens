@@ -49,7 +49,7 @@ class UsdaNutrition {
 class UsdaService {
   static const _baseUrl = 'https://api.nal.usda.gov/fdc/v1';
 
-  // Free USDA FoodData Central API key (registered to makhuvhap.c@gmail.com)
+  // Free USDA FoodData Central API key (registered to pcmacstudios@gmail.com)
   // 1,000 requests/hour — much better than the 30/hr DEMO_KEY limit.
   static const _apiKey = 'ZxOfZuZZNDJk6zPfQFUxXdl7kfjgGBPMYelrXJ0M';
 

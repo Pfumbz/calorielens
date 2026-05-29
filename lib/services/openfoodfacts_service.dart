@@ -41,7 +41,7 @@ class OpenFoodFactsService {
 
       final res = await http.get(
         Uri.parse(url),
-        headers: {'User-Agent': 'CalNova/1.0 (makhuvhap.c@gmail.com)'},
+        headers: {'User-Agent': 'CalNova/1.0 (pcmacstudios@gmail.com)'},
       );
 
       if (res.statusCode != 200) return null;

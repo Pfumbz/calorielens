@@ -1306,7 +1306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () async {
               final uri = Uri(
                 scheme: 'mailto',
-                path: 'makhuvhap.c@gmail.com',
+                path: 'pcmacstudios@gmail.com',
                 queryParameters: {
                   'subject': 'CalNova Feedback',
                 },
@@ -1317,7 +1317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('No email app found. Reach us at makhuvhap.c@gmail.com'),
+                      content: const Text('No email app found. Reach us at pcmacstudios@gmail.com'),
                       backgroundColor: CLColors.surface,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
