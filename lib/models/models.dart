@@ -94,6 +94,30 @@ class ScanResult {
             .toList(),
         overallNotes: (j['overall_notes'] ?? '') as String,
       );
+
+  /// Returns a new ScanResult with all nutrition values scaled by [factor].
+  /// Used for quantity corrections (e.g. ×3 for "3 cookies").
+  ScanResult scaled(double factor) {
+    if (factor == 1.0) return this;
+    final f = factor;
+    final qtyLabel = f == f.truncateToDouble()
+        ? '${f.toInt()}×'
+        : '${f}×';
+    return ScanResult(
+      mealName: mealName,
+      totalCalories: (totalCalories * f).round(),
+      proteinG: (proteinG * f).round(),
+      carbsG: (carbsG * f).round(),
+      fatG: (fatG * f).round(),
+      fiberG: (fiberG * f).round(),
+      overallNotes: overallNotes,
+      items: items.map((item) => item.copyWith(
+        calories: (item.calories * f).round(),
+        weightG: item.weightG != null ? item.weightG! * f : null,
+        portion: '$qtyLabel ${item.portion}',
+      )).toList(),
+    );
+  }
 }
 
 class FoodItem {

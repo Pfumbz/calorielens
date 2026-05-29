@@ -1459,79 +1459,192 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── RESULT PANEL ────────────────────────────────────────────────────────
   void _showEditSheet(ScanResult r) {
-    final itemCtrls = r.items.map((item) => TextEditingController(text: '${item.portion} ${item.name}')).toList();
+    // Name-only controllers — no portion/quantity mixed in
+    final nameCtrls = r.items
+        .map((item) => TextEditingController(text: item.name))
+        .toList();
+
+    // Single quantity multiplier for the whole meal (most corrections are
+    // "I had 2 of this" not "2 of item A but 1 of item B")
+    double quantity = 1.0;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: CLColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetCtx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 20, right: 20, top: 20),
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                  left: 20,
+                  right: 20,
+                  top: 20),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('Correct Food Items',
-                        style: TextStyle(color: CLColors.text, fontSize: 16, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: CLColors.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
-                    const Text('Fix any item names or quantities the AI got wrong, then re-analyse to recalculate nutrition.',
-                        style: TextStyle(color: CLColors.muted, fontSize: 12)),
+                    const Text(
+                      'Fix the food names below. Use the quantity field for "I had 2 of these".',
+                      style: TextStyle(color: CLColors.muted, fontSize: 12),
+                    ),
                     const SizedBox(height: 14),
-                    ...List.generate(itemCtrls.length, (i) => Padding(
+
+                    // ── Food name fields ─────────────────────────────────
+                    ...List.generate(nameCtrls.length, (i) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: itemCtrls[i],
-                              style: const TextStyle(color: CLColors.text, fontSize: 14),
+                              controller: nameCtrls[i],
+                              style: const TextStyle(
+                                  color: CLColors.text, fontSize: 14),
                               decoration: InputDecoration(
                                 hintText: 'Food item ${i + 1}',
                                 prefixIcon: Padding(
-                                  padding: const EdgeInsets.only(left: 12, right: 8),
+                                  padding: const EdgeInsets.only(
+                                      left: 12, right: 8),
                                   child: Text('${i + 1}.',
-                                      style: const TextStyle(color: CLColors.accent, fontSize: 14, fontWeight: FontWeight.w600)),
+                                      style: const TextStyle(
+                                          color: CLColors.accent,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600)),
                                 ),
-                                prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                                prefixIconConstraints:
+                                    const BoxConstraints(minWidth: 0, minHeight: 0),
                                 isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 12),
                               ),
                             ),
                           ),
-                          if (itemCtrls.length > 1)
+                          if (nameCtrls.length > 1)
                             IconButton(
-                              icon: const Icon(Icons.close, size: 18, color: CLColors.muted),
-                              onPressed: () { setSheetState(() { itemCtrls[i].dispose(); itemCtrls.removeAt(i); }); },
+                              icon: const Icon(Icons.close,
+                                  size: 18, color: CLColors.muted),
+                              onPressed: () {
+                                setSheetState(() {
+                                  nameCtrls[i].dispose();
+                                  nameCtrls.removeAt(i);
+                                });
+                              },
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              constraints: const BoxConstraints(
+                                  minWidth: 36, minHeight: 36),
                             ),
                         ],
                       ),
                     )),
                     TextButton.icon(
-                      onPressed: () { setSheetState(() { itemCtrls.add(TextEditingController()); }); },
+                      onPressed: () {
+                        setSheetState(
+                            () => nameCtrls.add(TextEditingController()));
+                      },
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('Add item'),
-                      style: TextButton.styleFrom(foregroundColor: CLColors.accent, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                      style: TextButton.styleFrom(
+                          foregroundColor: CLColors.accent,
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 8)),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
+
+                    // ── Quantity row ─────────────────────────────────────
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: CLColors.bg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: CLColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('How many servings?',
+                                    style: TextStyle(
+                                        color: CLColors.text,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600)),
+                                SizedBox(height: 2),
+                                Text(
+                                  'e.g. 3 cookies → set to 3. Calories scale automatically.',
+                                  style: TextStyle(
+                                      color: CLColors.muted, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Decrement
+                          _qtyButton(Icons.remove, () {
+                            if (quantity > 0.5) {
+                              setSheetState(() => quantity =
+                                  double.parse(
+                                      (quantity - 0.5).toStringAsFixed(1)));
+                            }
+                          }),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              quantity == quantity.truncateToDouble()
+                                  ? '${quantity.toInt()}'
+                                  : '$quantity',
+                              style: const TextStyle(
+                                  color: CLColors.text,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          // Increment
+                          _qtyButton(Icons.add, () {
+                            setSheetState(() => quantity =
+                                double.parse(
+                                    (quantity + 0.5).toStringAsFixed(1)));
+                          }),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          final items = itemCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
-                          if (items.isEmpty) return;
+                          final names = nameCtrls
+                              .map((c) => c.text.trim())
+                              .where((t) => t.isNotEmpty)
+                              .toList();
+                          if (names.isEmpty) return;
                           Navigator.pop(ctx);
-                          _reAnalyse(items, r);
+                          _reAnalyse(names, quantity, r);
                         },
                         icon: const Icon(Icons.auto_fix_high, size: 18),
-                        label: const Text('RE-ANALYSE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                        style: ElevatedButton.styleFrom(backgroundColor: CLColors.accent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                        label: const Text('RE-ANALYSE',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1)),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: CLColors.accent,
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14)),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -1545,8 +1658,31 @@ class _ScanScreenState extends State<ScanScreen>
     );
   }
 
-  Future<void> _reAnalyse(List<String> items, ScanResult original) async {
-    final description = items.join(', ');
+  Widget _qtyButton(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: CLColors.surface2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: CLColors.border),
+        ),
+        child: Icon(icon, size: 16, color: CLColors.accent),
+      ),
+    );
+  }
+
+  /// Re-analyses the meal using corrected food names + quantity.
+  ///
+  /// APPROACH:
+  /// • AI estimates nutrition for EXACTLY 1 unit/serving of the corrected
+  ///   food(s) using the original photo.
+  /// • Code then scales the result by [quantity] — deterministic and avoids
+  ///   AI arithmetic errors when the user says "3 cookies" but photo shows 1.
+  Future<void> _reAnalyse(
+      List<String> names, double quantity, ScanResult original) async {
     setState(() { _loading = true; _result = null; _updateResultFlag(); });
     _resultAnim.reset();
     try {
@@ -1560,35 +1696,38 @@ class _ScanScreenState extends State<ScanScreen>
         'fiber': original.fiberG,
       };
 
-      ScanResult result;
+      ScanResult oneUnit;
       if (_imageBytes != null) {
-        // Re-analyse using the original photo + corrected item names.
-        // The AI will re-estimate portion sizes from the image, which is
-        // why corrections were returning similar calories before — weight_g
-        // was locked from the first scan when using text-only re-analysis.
-        result = await state.backend.scanImage(
+        // Photo mode — re-analyse image with corrected names.
+        // The correctionHint contains names only (no quantity), so the AI
+        // estimates nutrition for 1 unit. We scale by quantity in code below.
+        oneUnit = await state.backend.scanImage(
           _imageBytes!,
           _mediaType,
-          correctionHint: description,
+          correctionHint: names.join(', '),
           originalContext: originalContext,
         );
       } else {
-        // Describe/barcode mode — no image available, fall back to text.
-        result = await state.backend.scanText(
-          description,
+        // Describe/barcode — no image, fall back to text.
+        oneUnit = await state.backend.scanText(
+          names.join(', '),
           isCorrection: true,
           originalContext: originalContext,
         );
       }
 
+      // Scale all macros by quantity in code — never trust the AI to do math
+      final result = oneUnit.scaled(quantity);
+
       setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
-      // No trackScan() here — corrections are free
     } catch (e) {
       setState(() => _loading = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyError(e)), backgroundColor: Colors.red.shade700),
+        SnackBar(
+            content: Text(friendlyError(e)),
+            backgroundColor: Colors.red.shade700),
       );
     }
   }

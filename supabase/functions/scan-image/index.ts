@@ -145,22 +145,25 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
 ${jsonFormat}`
 
     const ctx = original_context
-    const promptCorrection = `You are an expert nutritionist. The user previously logged a meal and is now correcting it with a fresh photo.
+    const promptCorrection = `You are an expert nutritionist. The user scanned a meal photo and is now correcting the AI's initial interpretation.
 
-ORIGINAL LOGGED MEAL:
+CORRECTED FOOD NAME(S): "${correction_hint}"
+
+ORIGINAL AI ESTIMATE:
 - Name: ${ctx?.name ?? 'Unknown'}
 - Calories: ${ctx?.calories ?? '?'} kcal
-- Protein: ${ctx?.protein ?? '?'}g | Carbs: ${ctx?.carbs ?? '?'}g | Fat: ${ctx?.fat ?? '?'}g | Fiber: ${ctx?.fiber ?? '?'}g
 
-The user says the meal should be: "${correction_hint}"
+CRITICAL RULE — SINGLE UNIT ONLY:
+Return nutrition for EXACTLY ONE unit/serving of each food. Ignore any numbers or quantities in the corrected name — quantity scaling is handled by the app in code. Your job is only to identify what the food is and estimate one serving.
 
 INSTRUCTIONS:
-1. Trust the FRESH PHOTO as the ground truth — use it to identify food items and re-estimate portion sizes from scratch. Ignore the original weight estimates entirely.
-2. Use the corrected description to resolve any ambiguity about what the food is.
-3. For EACH item, estimate weight_g from what you see in the photo.
-4. For EACH item, provide a usda_query — a simple generic English name for USDA lookup (e.g. "chicken thigh fried", "white rice cooked").
+1. Use the corrected food name(s) — do NOT fall back to the original AI name.
+2. Use the photo to estimate the weight_g of ONE unit (e.g. the weight of one cookie, one piece of chicken, one cup of rice visible in the photo).
+3. Use the corrected name to resolve the food type (e.g. "large cookie" → estimate a larger cookie weight from the photo).
+4. For EACH item, provide a usda_query — a simple generic English name for USDA lookup.
 5. For South African dishes (pap, chakalaka, boerewors, vetkoek, samp, mogodu, morogo) use SA-specific nutrition data.
 6. Round calories to the nearest 5.
+7. The portion field describes ONE unit only (e.g. "1 large cookie (~35g)").
 
 Respond ONLY in this exact JSON format (no markdown, no backticks):
 ${jsonFormat}`
