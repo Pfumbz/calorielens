@@ -44,6 +44,10 @@ class BackendService {
     String mediaType, {
     Uint8List? secondImageBytes,
     String? secondMediaType,
+    /// When set, this is a correction retake — the hint is the user's corrected
+    /// food description and originalContext holds the prior nutrition estimates.
+    String? correctionHint,
+    Map<String, dynamic>? originalContext,
   }) async {
     ScanResult aiResult;
     Map<String, dynamic>? rawJson;
@@ -52,7 +56,12 @@ class BackendService {
     final mediaList = [mediaType, if (secondMediaType != null) secondMediaType];
 
     if (_useByok) {
-      final (result, raw) = await AnthropicService(byokApiKey!).scanImageWithRaw(imageList, mediaList);
+      final (result, raw) = await AnthropicService(byokApiKey!).scanImageWithRaw(
+        imageList,
+        mediaList,
+        correctionHint: correctionHint,
+        originalContext: originalContext,
+      );
       aiResult = result;
       rawJson = raw;
     } else {
@@ -67,6 +76,8 @@ class BackendService {
         payload['imageBase64_2'] = base64Encode(secondImageBytes);
         payload['mediaType_2'] = secondMediaType ?? 'image/jpeg';
       }
+      if (correctionHint != null) payload['correction_hint'] = correctionHint;
+      if (originalContext != null) payload['original_context'] = originalContext;
 
       final res = await http.post(
         Uri.parse('$_functionsBaseUrl/scan-image'),

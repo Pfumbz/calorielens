@@ -59,12 +59,41 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
 
   /// Scan one or more images and return both the ScanResult and raw JSON.
   /// Supports multi-angle: pass two images for better portion depth estimation.
+  /// Pass [correctionHint] + [originalContext] when this is a correction retake.
   Future<(ScanResult, Map<String, dynamic>)> scanImageWithRaw(
     List<Uint8List> imageBytesList,
-    List<String> mediaTypes,
-  ) async {
+    List<String> mediaTypes, {
+    String? correctionHint,
+    Map<String, dynamic>? originalContext,
+  }) async {
     final isMulti = imageBytesList.length > 1;
-    final prompt = isMulti ? _imageScanPromptMulti : _imageScanPromptSingle;
+
+    // Choose prompt: correction retake, multi-angle, or standard single
+    String prompt;
+    if (correctionHint != null) {
+      final ctx = originalContext;
+      prompt = '''You are an expert nutritionist. The user previously logged a meal and is now correcting it with a fresh photo.
+
+ORIGINAL LOGGED MEAL:
+- Name: ${ctx?['name'] ?? 'Unknown'}
+- Calories: ${ctx?['calories'] ?? '?'} kcal
+- Protein: ${ctx?['protein'] ?? '?'}g | Carbs: ${ctx?['carbs'] ?? '?'}g | Fat: ${ctx?['fat'] ?? '?'}g | Fiber: ${ctx?['fiber'] ?? '?'}g
+
+The user says the meal should be: "$correctionHint"
+
+INSTRUCTIONS:
+1. Trust the FRESH PHOTO as the ground truth — use it to identify food items and re-estimate portion sizes from scratch. Ignore the original weight estimates entirely.
+2. Use the corrected description to resolve ambiguity (e.g. if you see fried chicken and the user wrote "fried chicken with skin", confirm that).
+3. For EACH item, estimate weight_g from what you see in the photo.
+4. For EACH item, provide a usda_query — a simple generic English name for the USDA database (e.g. "chicken thigh fried", "white rice cooked").
+5. For South African dishes (pap, chakalaka, boerewors, vetkoek, samp, mogodu, morogo) use SA-specific nutrition data.
+6. Round calories to the nearest 5.
+
+Respond ONLY in this exact JSON format (no markdown, no backticks):
+{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<USDA term>","note":"<observation>"}],"overall_notes":"<2-3 sentences>"}''';
+    } else {
+      prompt = isMulti ? _imageScanPromptMulti : _imageScanPromptSingle;
+    }
 
     // Build content array: images first, then prompt text
     final content = <Map<String, dynamic>>[];

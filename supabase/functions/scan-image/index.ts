@@ -68,9 +68,9 @@ serve(async (req) => {
       )
     }
 
-    // Parse request body (supports optional second image for multi-angle)
+    // Parse request body (supports optional second image and correction metadata)
     const body = await req.json()
-    const { imageBase64, mediaType, imageBase64_2, mediaType_2 } = body
+    const { imageBase64, mediaType, imageBase64_2, mediaType_2, correction_hint, original_context } = body
     if (!imageBase64 || !mediaType) {
       return new Response(JSON.stringify({ error: 'Missing imageBase64 or mediaType' }), {
         status: 400,
@@ -105,11 +105,14 @@ serve(async (req) => {
       )
     }
 
-    const hasSecondImage = imageBase64_2 && mediaType_2
+    const hasSecondImage = !!(imageBase64_2 && mediaType_2)
+    const isCorrection = !!correction_hint
 
     // Call Anthropic API (key stored securely in Supabase vault)
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not set in environment')
+
+    const jsonFormat = `{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
 
     const promptSingle = `You are an expert nutritionist specialising in South African cuisine. Analyse this meal photo and estimate its nutritional content.
 
@@ -124,7 +127,7 @@ INSTRUCTIONS:
 8. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
 
 Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
-{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
+${jsonFormat}`
 
     const promptMulti = `You are an expert nutritionist specialising in South African cuisine. You are given TWO photos of the SAME meal taken from different angles. Use BOTH images together to accurately identify food items and estimate portion sizes.
 
@@ -139,9 +142,30 @@ INSTRUCTIONS:
 8. The meal_name should be concise but descriptive (e.g. "Grilled Chicken with Pap & Chakalaka" not just "Plate of food").
 
 Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
-{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
+${jsonFormat}`
 
-    const prompt = hasSecondImage ? promptMulti : promptSingle
+    const ctx = original_context
+    const promptCorrection = `You are an expert nutritionist. The user previously logged a meal and is now correcting it with a fresh photo.
+
+ORIGINAL LOGGED MEAL:
+- Name: ${ctx?.name ?? 'Unknown'}
+- Calories: ${ctx?.calories ?? '?'} kcal
+- Protein: ${ctx?.protein ?? '?'}g | Carbs: ${ctx?.carbs ?? '?'}g | Fat: ${ctx?.fat ?? '?'}g | Fiber: ${ctx?.fiber ?? '?'}g
+
+The user says the meal should be: "${correction_hint}"
+
+INSTRUCTIONS:
+1. Trust the FRESH PHOTO as the ground truth — use it to identify food items and re-estimate portion sizes from scratch. Ignore the original weight estimates entirely.
+2. Use the corrected description to resolve any ambiguity about what the food is.
+3. For EACH item, estimate weight_g from what you see in the photo.
+4. For EACH item, provide a usda_query — a simple generic English name for USDA lookup (e.g. "chicken thigh fried", "white rice cooked").
+5. For South African dishes (pap, chakalaka, boerewors, vetkoek, samp, mogodu, morogo) use SA-specific nutrition data.
+6. Round calories to the nearest 5.
+
+Respond ONLY in this exact JSON format (no markdown, no backticks):
+${jsonFormat}`
+
+    const prompt = isCorrection ? promptCorrection : hasSecondImage ? promptMulti : promptSingle
 
     // Build content array — one or two images followed by prompt
     const contentArray: Array<Record<string, unknown>> = [
@@ -184,11 +208,14 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
 
-    // Increment scan count AFTER successful AI response (so failed calls don't count)
-    await supabase.rpc(
-      'increment_scan_if_allowed',
-      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
-    )
+    // Increment scan count AFTER successful AI response.
+    // Corrections with a photo retake don't consume a scan quota slot.
+    if (!isCorrection) {
+      await supabase.rpc(
+        'increment_scan_if_allowed',
+        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+      )
+    }
 
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
