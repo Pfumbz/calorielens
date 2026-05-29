@@ -1459,14 +1459,11 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── RESULT PANEL ────────────────────────────────────────────────────────
   void _showEditSheet(ScanResult r) {
-    // Name-only controllers — no portion/quantity mixed in
+    // One text controller and one integer quantity per item
     final nameCtrls = r.items
         .map((item) => TextEditingController(text: item.name))
         .toList();
-
-    // Single quantity multiplier for the whole meal (most corrections are
-    // "I had 2 of this" not "2 of item A but 1 of item B")
-    double quantity = 1.0;
+    final quantities = List<int>.filled(r.items.length, 1);
 
     showModalBottomSheet(
       context: context,
@@ -1495,61 +1492,108 @@ class _ScanScreenState extends State<ScanScreen>
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
                     const Text(
-                      'Fix the food names below. Use the quantity field for "I had 2 of these".',
+                      'Fix the names and adjust each item\'s quantity independently.',
                       style: TextStyle(color: CLColors.muted, fontSize: 12),
                     ),
                     const SizedBox(height: 14),
 
-                    // ── Food name fields ─────────────────────────────────
+                    // ── Per-item rows (name + individual qty stepper) ─────
                     ...List.generate(nameCtrls.length, (i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: nameCtrls[i],
-                              style: const TextStyle(
-                                  color: CLColors.text, fontSize: 14),
-                              decoration: InputDecoration(
-                                hintText: 'Food item ${i + 1}',
-                                prefixIcon: Padding(
-                                  padding: const EdgeInsets.only(
-                                      left: 12, right: 8),
-                                  child: Text('${i + 1}.',
-                                      style: const TextStyle(
-                                          color: CLColors.accent,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600)),
-                                ),
-                                prefixIconConstraints:
-                                    const BoxConstraints(minWidth: 0, minHeight: 0),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 12, horizontal: 12),
+                          Row(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text('${i + 1}.',
+                                    style: const TextStyle(
+                                        color: CLColors.accent,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600)),
                               ),
+                              Expanded(
+                                child: TextField(
+                                  controller: nameCtrls[i],
+                                  style: const TextStyle(
+                                      color: CLColors.text, fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: 'Food item ${i + 1}',
+                                    isDense: true,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            vertical: 10, horizontal: 12),
+                                  ),
+                                ),
+                              ),
+                              if (nameCtrls.length > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.close,
+                                      size: 16, color: CLColors.muted),
+                                  onPressed: () {
+                                    setSheetState(() {
+                                      nameCtrls[i].dispose();
+                                      nameCtrls.removeAt(i);
+                                      quantities.removeAt(i);
+                                    });
+                                  },
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                      minWidth: 32, minHeight: 32),
+                                ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 22, top: 6),
+                            child: Row(
+                              children: [
+                                const Text('Qty:',
+                                    style: TextStyle(
+                                        color: CLColors.muted, fontSize: 11)),
+                                const SizedBox(width: 6),
+                                _qtyButton(Icons.remove, () {
+                                  if (quantities[i] > 1) {
+                                    setSheetState(() => quantities[i]--);
+                                  }
+                                }),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8),
+                                  child: Text('${quantities[i]}',
+                                      style: TextStyle(
+                                          color: quantities[i] > 1
+                                              ? CLColors.accent
+                                              : CLColors.text,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700)),
+                                ),
+                                _qtyButton(Icons.add, () {
+                                  setSheetState(() => quantities[i]++);
+                                }),
+                                if (quantities[i] > 1)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      'x${quantities[i]} — scales automatically',
+                                      style: const TextStyle(
+                                          color: CLColors.muted,
+                                          fontSize: 10),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          if (nameCtrls.length > 1)
-                            IconButton(
-                              icon: const Icon(Icons.close,
-                                  size: 18, color: CLColors.muted),
-                              onPressed: () {
-                                setSheetState(() {
-                                  nameCtrls[i].dispose();
-                                  nameCtrls.removeAt(i);
-                                });
-                              },
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                  minWidth: 36, minHeight: 36),
-                            ),
                         ],
                       ),
                     )),
+
                     TextButton.icon(
                       onPressed: () {
-                        setSheetState(
-                            () => nameCtrls.add(TextEditingController()));
+                        setSheetState(() {
+                          nameCtrls.add(TextEditingController());
+                          quantities.add(1);
+                        });
                       },
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('Add item'),
@@ -1558,81 +1602,23 @@ class _ScanScreenState extends State<ScanScreen>
                           padding:
                               const EdgeInsets.symmetric(horizontal: 8)),
                     ),
-                    const SizedBox(height: 8),
-
-                    // ── Quantity row ─────────────────────────────────────
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: CLColors.bg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: CLColors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('How many servings?',
-                                    style: TextStyle(
-                                        color: CLColors.text,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600)),
-                                SizedBox(height: 2),
-                                Text(
-                                  'e.g. 3 cookies → set to 3. Calories scale automatically.',
-                                  style: TextStyle(
-                                      color: CLColors.muted, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Decrement
-                          _qtyButton(Icons.remove, () {
-                            if (quantity > 0.5) {
-                              setSheetState(() => quantity =
-                                  double.parse(
-                                      (quantity - 0.5).toStringAsFixed(1)));
-                            }
-                          }),
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 10),
-                            child: Text(
-                              quantity == quantity.truncateToDouble()
-                                  ? '${quantity.toInt()}'
-                                  : '$quantity',
-                              style: const TextStyle(
-                                  color: CLColors.text,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          // Increment
-                          _qtyButton(Icons.add, () {
-                            setSheetState(() => quantity =
-                                double.parse(
-                                    (quantity + 0.5).toStringAsFixed(1)));
-                          }),
-                        ],
-                      ),
-                    ),
 
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          final names = nameCtrls
-                              .map((c) => c.text.trim())
-                              .where((t) => t.isNotEmpty)
-                              .toList();
-                          if (names.isEmpty) return;
+                          // Build parallel lists: name + qty, skipping blank entries
+                          final entries = <MapEntry<String, int>>[];
+                          for (int i = 0; i < nameCtrls.length; i++) {
+                            final t = nameCtrls[i].text.trim();
+                            if (t.isNotEmpty) entries.add(MapEntry(t, quantities[i]));
+                          }
+                          if (entries.isEmpty) return;
+                          final names = entries.map((e) => e.key).toList();
+                          final qtys = entries.map((e) => e.value).toList();
                           Navigator.pop(ctx);
-                          _reAnalyse(names, quantity, r);
+                          _reAnalyse(names, qtys, r);
                         },
                         icon: const Icon(Icons.auto_fix_high, size: 18),
                         label: const Text('RE-ANALYSE',
@@ -1662,27 +1648,26 @@ class _ScanScreenState extends State<ScanScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 32,
-        height: 32,
+        width: 28,
+        height: 28,
         decoration: BoxDecoration(
           color: CLColors.surface2,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(color: CLColors.border),
         ),
-        child: Icon(icon, size: 16, color: CLColors.accent),
+        child: Icon(icon, size: 14, color: CLColors.accent),
       ),
     );
   }
 
-  /// Re-analyses the meal using corrected food names + quantity.
+  /// Re-analyses the meal using corrected food names + per-item quantities.
   ///
   /// APPROACH:
-  /// • AI estimates nutrition for EXACTLY 1 unit/serving of the corrected
-  ///   food(s) using the original photo.
-  /// • Code then scales the result by [quantity] — deterministic and avoids
-  ///   AI arithmetic errors when the user says "3 cookies" but photo shows 1.
+  /// • AI estimates nutrition for EXACTLY 1 unit/serving of each corrected item.
+  /// • Code multiplies each item by its individual quantity — deterministic,
+  ///   so "2 lemon wedges + 1 chicken" works correctly without AI arithmetic.
   Future<void> _reAnalyse(
-      List<String> names, double quantity, ScanResult original) async {
+      List<String> names, List<int> quantities, ScanResult original) async {
     setState(() { _loading = true; _result = null; _updateResultFlag(); });
     _resultAnim.reset();
     try {
@@ -1698,9 +1683,8 @@ class _ScanScreenState extends State<ScanScreen>
 
       ScanResult oneUnit;
       if (_imageBytes != null) {
-        // Photo mode — re-analyse image with corrected names.
-        // The correctionHint contains names only (no quantity), so the AI
-        // estimates nutrition for 1 unit. We scale by quantity in code below.
+        // Photo mode — AI estimates 1 unit of each corrected item from the photo.
+        // Names only are sent — no quantities — so AI is not confused by "3 of X".
         oneUnit = await state.backend.scanImage(
           _imageBytes!,
           _mediaType,
@@ -1716,8 +1700,49 @@ class _ScanScreenState extends State<ScanScreen>
         );
       }
 
-      // Scale all macros by quantity in code — never trust the AI to do math
-      final result = oneUnit.scaled(quantity);
+      // Per-item scaling: multiply each item by its quantity, then sum totals.
+      // If the AI returned fewer items than we asked for, remaining items get qty 1.
+      final scaledItems = <FoodItem>[];
+      int totalCal = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalFiber = 0;
+      for (int i = 0; i < oneUnit.items.length; i++) {
+        final item = oneUnit.items[i];
+        final qty = (i < quantities.length) ? quantities[i] : 1;
+        if (qty == 1) {
+          scaledItems.add(item);
+          totalCal += item.calories;
+        } else {
+          final scaledCal = (item.calories * qty);
+          scaledItems.add(item.copyWith(
+            calories: scaledCal,
+            weightG: item.weightG != null ? item.weightG! * qty : null,
+            portion: '${qty}x \${item.portion}',
+          ));
+          totalCal += scaledCal;
+        }
+      }
+      // Attribute macros proportionally from oneUnit totals × quantities
+      if (oneUnit.totalCalories > 0) {
+        for (int i = 0; i < oneUnit.items.length; i++) {
+          final item = oneUnit.items[i];
+          final qty = (i < quantities.length) ? quantities[i] : 1;
+          final share = item.calories / oneUnit.totalCalories;
+          totalProtein += (oneUnit.proteinG * share * qty).round();
+          totalCarbs   += (oneUnit.carbsG   * share * qty).round();
+          totalFat     += (oneUnit.fatG     * share * qty).round();
+          totalFiber   += (oneUnit.fiberG   * share * qty).round();
+        }
+      }
+
+      final result = ScanResult(
+        mealName: oneUnit.mealName,
+        totalCalories: totalCal,
+        proteinG: totalProtein,
+        carbsG: totalCarbs,
+        fatG: totalFat,
+        fiberG: totalFiber,
+        items: scaledItems,
+        overallNotes: oneUnit.overallNotes,
+      );
 
       setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);

@@ -1,7 +1,5 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/models.dart';
@@ -928,12 +926,9 @@ class TodayScreen extends StatelessWidget {
   // ── Correction sheet ──────────────────────────────────────────────────
   void _showCorrectionSheet(BuildContext context, DiaryEntry entry) {
     final controller = TextEditingController(text: entry.name);
-    final picker = ImagePicker();
 
     bool isAnalysing = false;
     String? errorMsg;
-    Uint8List? retakeBytes;
-    String? retakeMediaType;
 
     showModalBottomSheet(
       context: context,
@@ -960,23 +955,11 @@ class TodayScreen extends StatelessWidget {
                 'fiber': entry.fiber,
               };
 
-              ScanResult result;
-              if (retakeBytes != null) {
-                // Photo retake path — use scanImage with correction context
-                result = await state.backend.scanImage(
-                  retakeBytes!,
-                  retakeMediaType ?? 'image/jpeg',
-                  correctionHint: text,
-                  originalContext: originalContext,
-                );
-              } else {
-                // Text-only path
-                result = await state.backend.scanText(
-                  text,
-                  isCorrection: true,
-                  originalContext: originalContext,
-                );
-              }
+              final result = await state.backend.scanText(
+                text,
+                isCorrection: true,
+                originalContext: originalContext,
+              );
 
               await state.removeEntry(entry.id);
               final corrected = DiaryEntry(
@@ -1012,27 +995,6 @@ class TodayScreen extends StatelessWidget {
             }
           }
 
-          // ── Pick retake photo ───────────────────────────────────────────
-          Future<void> pickRetake(ImageSource source) async {
-            try {
-              final img = await picker.pickImage(
-                source: source,
-                maxWidth: 1200,
-                maxHeight: 1200,
-                imageQuality: 70,
-              );
-              if (img == null) return;
-              final bytes = await img.readAsBytes();
-              final mime = img.name.toLowerCase().endsWith('.png')
-                  ? 'image/png'
-                  : 'image/jpeg';
-              setSheetState(() {
-                retakeBytes = bytes;
-                retakeMediaType = mime;
-              });
-            } catch (_) {}
-          }
-
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(sbCtx).viewInsets.bottom,
@@ -1066,7 +1028,7 @@ class TodayScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Edit the description, then optionally retake a photo for a more accurate result',
+                      'Edit the description and we\'ll re-analyse the nutrition',
                       style: TextStyle(color: CLColors.muted, fontSize: 12),
                       textAlign: TextAlign.center,
                     ),
@@ -1098,115 +1060,6 @@ class TodayScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Optional retake photo section ──────────────────────
-                    if (retakeBytes == null) ...[
-                      // Prompt to retake
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: CLColors.bg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: CLColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Retake photo for better accuracy',
-                              style: TextStyle(
-                                color: CLColors.text,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'If the meal is still in front of you, a fresh photo helps the AI re-estimate portions more accurately.',
-                              style: TextStyle(color: CLColors.muted, fontSize: 11, height: 1.4),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: isAnalysing ? null : () => pickRetake(ImageSource.camera),
-                                    icon: const Icon(Icons.camera_alt_outlined, size: 16),
-                                    label: const Text('Camera', style: TextStyle(fontSize: 13)),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: CLColors.accent,
-                                      side: const BorderSide(color: CLColors.accent),
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: isAnalysing ? null : () => pickRetake(ImageSource.gallery),
-                                    icon: const Icon(Icons.photo_library_outlined, size: 16),
-                                    label: const Text('Gallery', style: TextStyle(fontSize: 13)),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: CLColors.accent,
-                                      side: const BorderSide(color: CLColors.accent),
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ] else ...[
-                      // Retake preview
-                      Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.memory(
-                              retakeBytes!,
-                              width: 72,
-                              height: 72,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Photo added ✓',
-                                  style: TextStyle(
-                                    color: CLColors.green,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'AI will use this photo + your description for a more accurate analysis.',
-                                  style: TextStyle(color: CLColors.muted, fontSize: 11, height: 1.4),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 18, color: CLColors.muted),
-                            onPressed: () => setSheetState(() {
-                              retakeBytes = null;
-                              retakeMediaType = null;
-                            }),
-                          ),
-                        ],
-                      ),
-                    ],
-
                     if (errorMsg != null) ...[
                       const SizedBox(height: 8),
                       Text(errorMsg!,
@@ -1228,11 +1081,7 @@ class TodayScreen extends StatelessWidget {
                                 ),
                               )
                             : const Icon(Icons.refresh, size: 18),
-                        label: Text(isAnalysing
-                            ? 'Analysing…'
-                            : retakeBytes != null
-                                ? 'Re-analyse with photo'
-                                : 'Re-analyse'),
+                        label: Text(isAnalysing ? 'Analysing…' : 'Re-analyse'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: CLColors.accent,
                           foregroundColor: Colors.white,
