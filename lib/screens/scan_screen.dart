@@ -1551,20 +1551,36 @@ class _ScanScreenState extends State<ScanScreen>
     _resultAnim.reset();
     try {
       final state = Provider.of<AppState>(context, listen: false);
-      // Pass isCorrection: true so neither the Edge Function nor local
-      // counter charge a scan — the user already spent one on the original.
-      final result = await state.backend.scanText(
-        description,
-        isCorrection: true,
-        originalContext: {
-          'name': original.mealName,
-          'calories': original.totalCalories,
-          'protein': original.proteinG,
-          'carbs': original.carbsG,
-          'fat': original.fatG,
-          'fiber': original.fiberG,
-        },
-      );
+      final originalContext = {
+        'name': original.mealName,
+        'calories': original.totalCalories,
+        'protein': original.proteinG,
+        'carbs': original.carbsG,
+        'fat': original.fatG,
+        'fiber': original.fiberG,
+      };
+
+      ScanResult result;
+      if (_imageBytes != null) {
+        // Re-analyse using the original photo + corrected item names.
+        // The AI will re-estimate portion sizes from the image, which is
+        // why corrections were returning similar calories before — weight_g
+        // was locked from the first scan when using text-only re-analysis.
+        result = await state.backend.scanImage(
+          _imageBytes!,
+          _mediaType,
+          correctionHint: description,
+          originalContext: originalContext,
+        );
+      } else {
+        // Describe/barcode mode — no image available, fall back to text.
+        result = await state.backend.scanText(
+          description,
+          isCorrection: true,
+          originalContext: originalContext,
+        );
+      }
+
       setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
       // No trackScan() here — corrections are free
