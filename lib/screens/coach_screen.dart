@@ -1654,6 +1654,17 @@ class _RichChatContent extends StatelessWidget {
         continue;
       }
 
+      // ── Markdown table ──
+      if (line.startsWith('|') && line.length > 1) {
+        final tableLines = <String>[];
+        while (i < lines.length && lines[i].trim().startsWith('|')) {
+          tableLines.add(lines[i]);
+          i++;
+        }
+        widgets.add(_buildMarkdownTable(tableLines));
+        continue;
+      }
+
       // ── H2: ## Subheader — rendered as section card header ──
       if (line.startsWith('## ')) {
         // Collect all content lines until next ## or end
@@ -1667,10 +1678,25 @@ class _RichChatContent extends StatelessWidget {
 
         // Build section content widgets
         final sectionWidgets = <Widget>[];
-        for (final sLine in sectionLines) {
+        int si = 0;
+        while (si < sectionLines.length) {
+          final sLine = sectionLines[si];
           final trimmed = sLine.trim();
+
+          // ── Table rows inside section ──
+          if (trimmed.startsWith('|') && trimmed.length > 1) {
+            final tableLines = <String>[];
+            while (si < sectionLines.length && sectionLines[si].trim().startsWith('|')) {
+              tableLines.add(sectionLines[si]);
+              si++;
+            }
+            sectionWidgets.add(_buildMarkdownTable(tableLines));
+            continue;
+          }
+
           if (trimmed.isEmpty) {
             if (sectionWidgets.isNotEmpty) sectionWidgets.add(const SizedBox(height: 4));
+            si++;
             continue;
           }
           if (RegExp(r'^\d+[\.\)]\s').hasMatch(trimmed)) {
@@ -1695,6 +1721,7 @@ class _RichChatContent extends StatelessWidget {
                   ],
                 ),
               ));
+              si++;
               continue;
             }
           }
@@ -1713,12 +1740,14 @@ class _RichChatContent extends StatelessWidget {
                 ],
               ),
             ));
+            si++;
             continue;
           }
           sectionWidgets.add(Padding(
             padding: const EdgeInsets.symmetric(vertical: 1),
             child: _buildRichLine(trimmed),
           ));
+          si++;
         }
 
         widgets.add(Container(
@@ -1902,6 +1931,90 @@ class _RichChatContent extends StatelessWidget {
     return RichText(text: TextSpan(children: spans));
   }
 }
+
+
+  /// Parses markdown table rows and renders a styled Flutter table widget.
+  Widget _buildMarkdownTable(List<String> tableLines) {
+    final rows = <List<String>>[];
+    for (final line in tableLines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      // Skip separator rows: |---|---|
+      if (RegExp(r'^[|\-:\s]+$').hasMatch(trimmed)) continue;
+      final cells = trimmed
+          .split('|')
+          .map((c) => c.trim())
+          .where((c) => c.isNotEmpty)
+          .toList();
+      if (cells.isNotEmpty) rows.add(cells);
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    final colCount = rows.map((r) => r.length).reduce((a, b) => a > b ? a : b);
+
+    Color statusColor(String text) {
+      final lower = text.toLowerCase();
+      if (lower.contains('perfect') || lower.contains('strong') ||
+          lower.contains('good') || lower.contains('on track') ||
+          text.contains('✓')) return const Color(0xFF4CAF50);
+      if (lower.contains('over') || lower.contains('low') ||
+          lower.contains('high') || text.contains('⚠')) return const Color(0xFFFF9800);
+      return CLColors.muted;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: CLColors.bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: CLColors.border.withOpacity(0.6)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Table(
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        columnWidths: {
+          for (int c = 0; c < colCount; c++) c: const FlexColumnWidth(1),
+        },
+        children: rows.asMap().entries.map((entry) {
+          final rowIdx = entry.key;
+          final cells = entry.value;
+          final isHeaderRow = rowIdx == 0 && rows.length > 1;
+          return TableRow(
+            decoration: BoxDecoration(
+              color: isHeaderRow
+                  ? CLColors.accent.withOpacity(0.12)
+                  : rowIdx.isOdd
+                      ? CLColors.surface.withOpacity(0.25)
+                      : Colors.transparent,
+            ),
+            children: List.generate(colCount, (colIdx) {
+              final cellText = colIdx < cells.length ? cells[colIdx] : '';
+              final Color cellColor = isHeaderRow
+                  ? CLColors.accent
+                  : colIdx == cells.length - 1
+                      ? statusColor(cellText)
+                      : colIdx == 0
+                          ? CLColors.text
+                          : CLColors.muted;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                child: Text(
+                  cellText,
+                  style: TextStyle(
+                    color: cellColor,
+                    fontSize: isHeaderRow ? 11 : 12,
+                    fontWeight: isHeaderRow ? FontWeight.w700 : FontWeight.normal,
+                    height: 1.3,
+                  ),
+                  textAlign: colIdx == 0 ? TextAlign.left : TextAlign.center,
+                ),
+              );
+            }),
+          );
+        }).toList(),
+      ),
+    );
+  }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ── MEAL DETAIL SHEET ───────────────────────────────────────────────────
