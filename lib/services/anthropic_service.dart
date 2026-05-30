@@ -72,28 +72,32 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
     String prompt;
     if (correctionHint != null) {
       final ctx = originalContext;
-      prompt = '''You are an expert nutritionist. The user scanned a meal photo and is now correcting the food name(s) the AI identified.
+      prompt = '''You are an expert nutritionist. The user has CORRECTED a food identification mistake made by the AI.
+
+⚠️ OVERRIDE IN EFFECT — THE USER'S CORRECTION IS THE GROUND TRUTH ⚠️
+The AI previously misidentified the food. The user is now telling you what it actually is.
+You MUST trust the user's correction completely. Do NOT use the photo to re-identify the food — the photo is ONLY for estimating portion size (weight in grams).
 
 CORRECTED FOOD NAME(S): "$correctionHint"
 
-ORIGINAL AI ESTIMATE:
-- Name: ${ctx?['name'] ?? 'Unknown'}
-- Calories: ${ctx?['calories'] ?? '?'} kcal
+WHAT THE AI PREVIOUSLY (WRONGLY) CALLED IT: ${ctx?['name'] ?? 'Unknown'}
+— Ignore this. The user says it is wrong.
 
-CRITICAL RULE — SINGLE UNIT ONLY:
-Return nutrition for EXACTLY ONE unit/serving of each food. Ignore any numbers or quantities in the corrected name — quantity scaling is handled by the app in code. Your job is only to identify what the food is and estimate one serving.
+RULE 1 — FOOD IDENTITY: The corrected name above is what the food IS. Accept it without question. Never revert to the old name or let the photo override it.
+RULE 2 — SINGLE UNIT: Return nutrition for EXACTLY ONE unit/serving. Ignore any quantity numbers in the corrected name — the app handles scaling in code.
+RULE 3 — PHOTO USE: Use the photo ONLY to estimate the weight in grams of one unit/serving of the corrected food. Nothing else.
 
 INSTRUCTIONS:
-1. Use the corrected food name(s) — do NOT fall back to the original AI name.
-2. Use the photo to estimate the weight_g of ONE unit (e.g. the weight of one cookie, one piece of chicken, one cup of rice visible in the photo).
-3. Use the corrected name to resolve the food type (e.g. "large cookie" → estimate a larger cookie weight from the photo).
+1. Look up nutrition data for "${correctionHint}" — this is the food, full stop.
+2. Use the photo to estimate weight_g of ONE serving of that food as it appears on the plate.
+3. Calculate calories and macros from the corrected food's nutrition data × estimated weight.
 4. For EACH item, provide a usda_query — a simple generic English name for USDA lookup.
-5. For South African dishes (pap, chakalaka, boerewors, vetkoek, samp, mogodu, morogo) use SA-specific nutrition data.
+5. For South African dishes (pap, chakalaka, boerewors, vetkoek, samp, mogodu, morogo, pork trotters) use SA-specific nutrition data.
 6. Round calories to the nearest 5.
-7. The portion field describes ONE unit only (e.g. "1 large cookie (~35g)").
+7. The portion field describes ONE unit only (e.g. "1 pork trotter (~200g)").
 
 Respond ONLY in this exact JSON format (no markdown, no backticks):
-{"meal_name":"<name matching user correction>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<corrected food name>","portion":"<1 unit size>","calories":<int>,"weight_g":<number>,"usda_query":"<USDA term>","note":"<observation>"}],"overall_notes":"<2-3 sentences>"}''';
+{"meal_name":"<name using corrected food>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<corrected food name>","portion":"<1 unit size>","calories":<int>,"weight_g":<number>,"usda_query":"<USDA term>","note":"<observation>"}],"overall_notes":"<2-3 sentences>"}''';
     } else {
       prompt = isMulti ? _imageScanPromptMulti : _imageScanPromptSingle;
     }
