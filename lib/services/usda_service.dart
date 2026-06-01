@@ -49,9 +49,10 @@ class UsdaNutrition {
 class UsdaService {
   static const _baseUrl = 'https://api.nal.usda.gov/fdc/v1';
 
-  // Free USDA FoodData Central API key (registered to pcmacstudios@gmail.com)
-  // 1,000 requests/hour — much better than the 30/hr DEMO_KEY limit.
-  static const _apiKey = 'ZxOfZuZZNDJk6zPfQFUxXdl7kfjgGBPMYelrXJ0M';
+  // USDA API key injected at build time via --dart-define=USDA_API_KEY=...
+  // Never hardcode this value here — the key must stay out of source control.
+  // Falls back to DEMO_KEY (30 req/hr) if not set.
+  static const _apiKey = String.fromEnvironment('USDA_API_KEY', defaultValue: 'DEMO_KEY');
 
   // USDA nutrient IDs we care about
   static const _nutrientIds = {
