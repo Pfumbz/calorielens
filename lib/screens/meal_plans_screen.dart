@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../data/meal_plans.dart';
 import '../models/meal_plan.dart';
+import '../models/models.dart';
 import '../services/food_image_service.dart';
 import '../theme.dart';
 import '../widgets/ad_banner.dart';
@@ -94,6 +95,9 @@ class _MealPlansScreenState extends State<MealPlansScreen> {
             ),
           ),
         ),
+
+        // ── Recent Meals ─────────────────────────────────────────
+        SliverToBoxAdapter(child: _RecentMealsSection(state: state)),
 
         // ── Generate Plan / My Plans toggle ─────────────────────
         SliverToBoxAdapter(
@@ -318,6 +322,9 @@ class _MealPlansScreenState extends State<MealPlansScreen> {
             ),
           ),
         ),
+
+        // ── Recent Meals ─────────────────────────────────────────
+        SliverToBoxAdapter(child: _RecentMealsSection(state: state)),
 
         // ── Action cards: Scan Fridge + Generate Plan ────────────
         SliverToBoxAdapter(
@@ -584,6 +591,252 @@ class _MealPlansScreenState extends State<MealPlansScreen> {
                 : 'Try a different category',
             style: const TextStyle(color: CLColors.muted, fontSize: 13),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ── RECENT MEALS SECTION ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+class _RecentMealsSection extends StatelessWidget {
+  final AppState state;
+  const _RecentMealsSection({required this.state});
+
+  List<DiaryEntry> _recentUnique() => state.getRecentMeals();
+
+  void _showLogAgainSheet(BuildContext context, DiaryEntry entry) {
+    int servings = 1;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: CLColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle
+                Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: CLColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  entry.name,
+                  style: const TextStyle(
+                    color: CLColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${entry.calories} kcal · ${entry.protein}g protein · ${entry.carbs}g carbs · ${entry.fat}g fat',
+                  style: const TextStyle(color: CLColors.muted, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                // Servings stepper
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: CLColors.bg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: CLColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('How many servings?',
+                                style: TextStyle(
+                                    color: CLColors.text,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            SizedBox(height: 2),
+                            Text('Calories scale automatically',
+                                style: TextStyle(
+                                    color: CLColors.muted, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () { if (servings > 1) setState(() => servings--); },
+                        child: Container(
+                          width: 32, height: 32,
+                          decoration: BoxDecoration(
+                            color: CLColors.surface2,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: CLColors.border),
+                          ),
+                          child: const Icon(Icons.remove, size: 16, color: CLColors.accent),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('$servings',
+                            style: const TextStyle(
+                                color: CLColors.text,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => servings++),
+                        child: Container(
+                          width: 32, height: 32,
+                          decoration: BoxDecoration(
+                            color: CLColors.surface2,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: CLColors.border),
+                          ),
+                          child: const Icon(Icons.add, size: 16, color: CLColors.accent),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await state.reLogEntry(entry, servings: servings);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Logged: ${entry.name} — ${entry.calories * servings} kcal',
+                            ),
+                            backgroundColor: CLColors.green,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: const Text('Log to today',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CLColors.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final meals = _recentUnique();
+    if (meals.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.history, color: CLColors.accent, size: 16),
+              const SizedBox(width: 6),
+              const Text('Recent Meals',
+                  style: TextStyle(
+                      color: CLColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text('Last 14 days',
+                  style: const TextStyle(
+                      color: CLColors.muted, fontSize: 11)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...meals.take(8).map((entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: CLColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: CLColors.border.withOpacity(0.5)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.name,
+                            style: const TextStyle(
+                                color: CLColors.text,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${entry.calories} kcal · P${entry.protein}g · C${entry.carbs}g · F${entry.fat}g',
+                            style: const TextStyle(
+                                color: CLColors.muted, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: TextButton.icon(
+                      onPressed: () => _showLogAgainSheet(context, entry),
+                      icon: const Icon(Icons.add, size: 14),
+                      label: const Text('Log again',
+                          style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: CLColors.accent,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )),
+          const SizedBox(height: 4),
         ],
       ),
     );

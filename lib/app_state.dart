@@ -425,6 +425,43 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// Returns unique recent meals across the last [days] days, most recent first.
+  /// Deduplicates by name so the same meal only appears once.
+  List<DiaryEntry> getRecentMeals({int days = 14}) {
+    final range = _storage.getDiaryRange(days: days);
+    final seen = <String>{};
+    final result = <DiaryEntry>[];
+    for (final day in range) {
+      for (final entry in day.entries.reversed) {
+        final key = entry.name.toLowerCase().trim();
+        if (!seen.contains(key)) {
+          seen.add(key);
+          result.add(entry);
+        }
+      }
+    }
+    return result;
+  }
+
+  /// Re-logs a previously logged meal as a new entry for today.
+  /// Optionally scales all nutrition values by [servings].
+  Future<void> reLogEntry(DiaryEntry original, {int servings = 1}) async {
+    final now = TimeOfDay.now();
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final entry = DiaryEntry(
+      id: DateTime.now().millisecondsSinceEpoch,
+      time: timeStr,
+      name: original.name,
+      calories: original.calories * servings,
+      protein: original.protein * servings,
+      carbs: original.carbs * servings,
+      fat: original.fat * servings,
+      fiber: original.fiber * servings,
+    );
+    await addEntry(entry);
+  }
+
   Future<void> removeEntry(int id) async {
     await _storage.removeDiaryEntry(id);
     _diary = _storage.getDiary();
