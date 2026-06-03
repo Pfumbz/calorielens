@@ -1532,11 +1532,12 @@ class _ScanScreenState extends State<ScanScreen>
                                   icon: const Icon(Icons.close,
                                       size: 16, color: CLColors.muted),
                                   onPressed: () {
+                                    final ctrl = nameCtrls[i];
                                     setSheetState(() {
-                                      nameCtrls[i].dispose();
                                       nameCtrls.removeAt(i);
                                       quantities.removeAt(i);
                                     });
+                                    ctrl.dispose();
                                   },
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(
