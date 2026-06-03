@@ -15,7 +15,7 @@ import '../widgets/analysis_loading.dart';
 import '../widgets/upgrade_modal.dart';
 
 
-enum _ScanMode { photo, text, barcode }
+enum _ScanMode { photo, text, barcode, recent }
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -348,25 +348,26 @@ class _ScanScreenState extends State<ScanScreen>
               else ...[
                 _buildModeToggle(),
                 const SizedBox(height: 16),
-                if (_scanMode == _ScanMode.text)
+                if (_scanMode == _ScanMode.recent)
+                  _buildRecentTab(state)
+                else if (_scanMode == _ScanMode.text)
                   _buildTextInput()
                 else if (_scanMode == _ScanMode.barcode)
                   _buildBarcodeScanner()
                 else
                   _buildPhotoArea(),
-                const SizedBox(height: 14),
-                if (_error != null && _scanMode != _ScanMode.barcode) _buildError(),
-                // Show premium loading animation while analysing
-                if (_loading && _scanMode != _ScanMode.barcode)
-                  const AnalysisLoadingWidget()
-                // Describe mode: always show Analyse button (greyed → active)
-                // Photo mode: show banner on landing, Analyse button when image selected
-                else if (_scanMode == _ScanMode.text)
-                  _buildAnalyseBtn()
-                else if (_scanMode == _ScanMode.photo && _imageBytes != null)
-                  _buildAnalyseBtn()
-                else if (_scanMode == _ScanMode.photo)
-                  _buildMealIntelligenceBanner(),
+                if (_scanMode != _ScanMode.recent) ...[
+                  const SizedBox(height: 14),
+                  if (_error != null && _scanMode != _ScanMode.barcode) _buildError(),
+                  if (_loading && _scanMode != _ScanMode.barcode)
+                    const AnalysisLoadingWidget()
+                  else if (_scanMode == _ScanMode.text)
+                    _buildAnalyseBtn()
+                  else if (_scanMode == _ScanMode.photo && _imageBytes != null)
+                    _buildAnalyseBtn()
+                  else if (_scanMode == _ScanMode.photo)
+                    _buildMealIntelligenceBanner(),
+                ],
               ],
               const SizedBox(height: 20),
             ],
@@ -479,15 +480,20 @@ class _ScanScreenState extends State<ScanScreen>
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: CLColors.border),
       ),
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       child: Row(
         children: [
           _modeTab(Icons.camera_alt_outlined, 'Photo', _scanMode == _ScanMode.photo,
               () => _switchMode(_ScanMode.photo)),
+          const SizedBox(width: 2),
           _modeTab(Icons.edit_outlined, 'Describe', _scanMode == _ScanMode.text,
               () => _switchMode(_ScanMode.text)),
+          const SizedBox(width: 2),
           _modeTab(Icons.qr_code_scanner, 'Barcode', _scanMode == _ScanMode.barcode,
               () => _switchMode(_ScanMode.barcode)),
+          const SizedBox(width: 2),
+          _modeTab(Icons.history_rounded, 'Recent', _scanMode == _ScanMode.recent,
+              () => _switchMode(_ScanMode.recent)),
         ],
       ),
     );
@@ -497,22 +503,31 @@ class _ScanScreenState extends State<ScanScreen>
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 11),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: active ? CLColors.accent.withOpacity(0.15) : Colors.transparent,
+            color: active ? CLColors.accent.withOpacity(0.13) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
-            border: active ? Border.all(color: CLColors.accent.withOpacity(0.5)) : null,
+            border: active
+                ? Border.all(color: CLColors.accent.withOpacity(0.45), width: 1)
+                : null,
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: active ? CLColors.accent : CLColors.muted),
-              const SizedBox(width: 6),
+              Icon(icon,
+                  size: 18,
+                  color: active ? CLColors.accent : CLColors.muted.withOpacity(0.7)),
+              const SizedBox(height: 3),
               Text(label,
                   style: TextStyle(
-                    color: active ? CLColors.accent : CLColors.muted,
-                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: active ? CLColors.accent : CLColors.muted.withOpacity(0.7),
+                    fontSize: 10,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    letterSpacing: 0.2,
                   )),
             ],
           ),
@@ -1341,6 +1356,439 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  // ── RECENT TAB ──────────────────────────────────────────────────────────────
+  static String _mealCategory(String time) {
+    final parts = time.split(':');
+    if (parts.length < 2) return 'Other';
+    final hour = int.tryParse(parts[0]) ?? 12;
+    if (hour >= 5 && hour < 11) return '🌅  Breakfast';
+    if (hour >= 11 && hour < 15) return '☀️  Lunch';
+    if (hour >= 15 && hour < 17) return '🌤️  Snack';
+    if (hour >= 17 && hour < 22) return '🌙  Dinner';
+    return '🌃  Late Night';
+  }
+
+  static const _categoryOrder = [
+    '🌅  Breakfast',
+    '☀️  Lunch',
+    '🌤️  Snack',
+    '🌙  Dinner',
+    '🌃  Late Night',
+    'Other',
+  ];
+
+  Widget _buildRecentTab(AppState state) {
+    final meals = state.getRecentMeals(days: 14);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 4),
+
+        // ── Intro card ──────────────────────────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                CLColors.accent.withOpacity(0.08),
+                CLColors.surface.withOpacity(0.6),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: CLColors.accent.withOpacity(0.15)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: CLColors.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.history_rounded,
+                    color: CLColors.accent, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Log a previous meal instantly',
+                        style: TextStyle(
+                            color: CLColors.text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
+                    SizedBox(height: 2),
+                    Text(
+                      'Your last 14 days of meals, grouped by mealtime. Tap Log again to add to today.',
+                      style: TextStyle(color: CLColors.muted, fontSize: 11, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        if (meals.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Column(
+                children: [
+                  Icon(Icons.restaurant_outlined,
+                      color: CLColors.muted.withOpacity(0.4), size: 48),
+                  const SizedBox(height: 12),
+                  const Text('No meals logged yet',
+                      style: TextStyle(
+                          color: CLColors.muted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 4),
+                  const Text('Scan or describe a meal to get started',
+                      style: TextStyle(color: CLColors.muted, fontSize: 12)),
+                ],
+              ),
+            ),
+          )
+        else ...[
+          // Group meals by category
+          ...() {
+            final grouped = <String, List<DiaryEntry>>{};
+            for (final meal in meals) {
+              final cat = _mealCategory(meal.time);
+              grouped.putIfAbsent(cat, () => []).add(meal);
+            }
+            final widgets = <Widget>[];
+            for (final cat in _categoryOrder) {
+              final items = grouped[cat];
+              if (items == null || items.isEmpty) continue;
+              widgets.add(_buildCategoryGroup(context, state, cat, items));
+            }
+            return widgets;
+          }(),
+        ],
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildCategoryGroup(
+      BuildContext context, AppState state, String category, List<DiaryEntry> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Category header
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 3, height: 14,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: CLColors.accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(category,
+                  style: const TextStyle(
+                      color: CLColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3)),
+            ],
+          ),
+        ),
+        // Meal cards
+        ...items.map((entry) => _buildRecentMealCard(context, state, entry)),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  Widget _buildRecentMealCard(
+      BuildContext context, AppState state, DiaryEntry entry) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CLColors.border.withOpacity(0.6)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => _showRecentLogSheet(context, state, entry),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  // Left — meal info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.name,
+                          style: const TextStyle(
+                              color: CLColors.text,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 5),
+                        Wrap(
+                          spacing: 5,
+                          runSpacing: 4,
+                          children: [
+                            _macroPill(
+                                '${entry.calories} kcal', CLColors.accent),
+                            _macroPill('P ${entry.protein}g', CLColors.blue),
+                            _macroPill('C ${entry.carbs}g', CLColors.green),
+                            _macroPill('F ${entry.fat}g', CLColors.muted),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Right — log button
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: CLColors.accent.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: CLColors.accent.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 14, color: CLColors.accent),
+                        SizedBox(width: 4),
+                        Text('Log again',
+                            style: TextStyle(
+                                color: CLColors.accent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _macroPill(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  void _showRecentLogSheet(
+      BuildContext context, AppState state, DiaryEntry entry) {
+    int servings = 1;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: CLColors.surface,
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                        color: CLColors.border,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Meal name
+                Text(entry.name,
+                    style: const TextStyle(
+                        color: CLColors.text,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 8),
+                // Macro row
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _macroPill(
+                        '${entry.calories * servings} kcal', CLColors.accent),
+                    _macroPill(
+                        'P ${entry.protein * servings}g', CLColors.blue),
+                    _macroPill(
+                        'C ${entry.carbs * servings}g', CLColors.green),
+                    _macroPill(
+                        'F ${entry.fat * servings}g', CLColors.muted),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Servings stepper
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: CLColors.bg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: CLColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('How many servings?',
+                                style: TextStyle(
+                                    color: CLColors.text,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            SizedBox(height: 2),
+                            Text('Calories scale automatically',
+                                style: TextStyle(
+                                    color: CLColors.muted,
+                                    fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () {
+                          if (servings > 1) setSheet(() => servings--);
+                        },
+                        child: Container(
+                          width: 34, height: 34,
+                          decoration: BoxDecoration(
+                            color: CLColors.surface2,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: CLColors.border),
+                          ),
+                          child: const Icon(Icons.remove,
+                              size: 16, color: CLColors.accent),
+                        ),
+                      ),
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 14),
+                        child: Text('$servings',
+                            style: const TextStyle(
+                                color: CLColors.text,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800)),
+                      ),
+                      GestureDetector(
+                        onTap: () => setSheet(() => servings++),
+                        child: Container(
+                          width: 34, height: 34,
+                          decoration: BoxDecoration(
+                            color: CLColors.surface2,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: CLColors.border),
+                          ),
+                          child: const Icon(Icons.add,
+                              size: 16, color: CLColors.accent),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Log button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await state.reLogEntry(entry, servings: servings);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Added to today: ${entry.name} · ${entry.calories * servings} kcal',
+                            ),
+                            backgroundColor: CLColors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text('Log to today',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CLColors.accent,
+                      foregroundColor: Colors.white,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
