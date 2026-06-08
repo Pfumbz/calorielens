@@ -2289,6 +2289,14 @@ class _EditSheetState extends State<_EditSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: List.generate(_nameCtrls.length, (i) => Padding(
+                  // Stable identity per item. The controller object travels
+                  // with its logical row across insert/delete, so keying on it
+                  // lets Flutter match each element to the correct controller.
+                  // Without this, deleting row i rebinds every TextField below
+                  // it to a different controller, forcing each EditableText to
+                  // reset its platform IME input connection — the multi-second
+                  // lag on add/delete.
+                  key: ObjectKey(_nameCtrls[i]),
                   padding: const EdgeInsets.only(bottom: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
