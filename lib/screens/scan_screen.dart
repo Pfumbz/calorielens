@@ -2226,7 +2226,10 @@ class _EditSheetState extends State<_EditSheet> {
     _nameCtrls = widget.result.items
         .map((item) => TextEditingController(text: item.name))
         .toList();
-    _quantities = List<int>.filled(widget.result.items.length, 1);
+    // NB: must be growable. List.filled() defaults to growable:false, which
+    // makes _quantities.add()/removeAt() throw, breaking Add/Delete and
+    // corrupting list-length parity with _nameCtrls. generate() is growable.
+    _quantities = List<int>.generate(widget.result.items.length, (_) => 1);
   }
 
   @override
