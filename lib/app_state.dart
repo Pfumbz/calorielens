@@ -24,6 +24,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool _isPremium = false;
   String _apiKey = '';
 
+  // Cache — invalidated whenever _apiKey changes.
+  BackendService? _backendCache;
+
   // ── Auth / cloud state ──────────────────────────────────────────────────
   User? _supabaseUser;
   int _backendScansToday = 0;
@@ -109,8 +112,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     return false; // not signed in at all
   }
 
-  /// Returns a ready-to-use BackendService with the current BYOK key (if any).
-  BackendService get backend => BackendService(byokApiKey: _apiKey.isNotEmpty ? _apiKey : null);
+  /// Returns a cached BackendService. Recreated only when the BYOK key changes.
+  BackendService get backend {
+    _backendCache ??= BackendService(byokApiKey: _apiKey.isNotEmpty ? _apiKey : null);
+    return _backendCache!;
+  }
 
   /// Build a 7-day meal history summary for Pro AI context.
   /// Returns null for non-Pro users (they only get today's context).
@@ -156,11 +162,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     // Always load local data first (works offline)
-    _diary       = _storage.getDiary();
-    _profile     = _storage.profile;
-    _calorieGoal = _storage.calorieGoal;
-    _isPremium   = _storage.isPremium;
-    _apiKey      = _storage.apiKey;
+    _diary        = _storage.getDiary();
+    _profile      = _storage.profile;
+    _calorieGoal  = _storage.calorieGoal;
+    _isPremium    = _storage.isPremium;
+    _apiKey       = await _storage.getApiKey(); // secure storage — must await
+    _backendCache = null; // clear cache after key load
     _savedPlanIds = _storage.savedPlanIds;
     _lastLoadedDate = _todayString();
 
@@ -215,6 +222,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     _healthRefreshTimer?.cancel();
+    _purchases.dispose(); // cancel billing stream subscription
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -475,6 +483,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> clearAllEntries() async {
     await _storage.saveDiary([]);
     _diary = [];
+    // Sync deletion to cloud so entries don't reappear after _refreshFromCloud.
+    if (isSignedIn && _supabaseUser != null) {
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      unawaited(SupabaseService.client
+          .from('diary_entries')
+          .delete()
+          .eq('user_id', _supabaseUser!.id)
+          .eq('date', today)
+          .then((_) {})
+          .catchError((e) => debugPrint('clearAllEntries cloud sync error: $e')));
+    }
     unawaited(NotificationService.scheduleNudges(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
@@ -512,6 +531,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> saveApiKey(String key) async {
     await _storage.saveApiKey(key);
     _apiKey = key;
+    _backendCache = null; // force BackendService recreation with new key
     notifyListeners();
   }
 

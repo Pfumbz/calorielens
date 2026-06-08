@@ -38,9 +38,14 @@ void main() async {
     MobileAds.instance.initialize(),
   ]);
 
+  // H-1: init() is async — await it before runApp so the first frame has real
+  // data (diary, premium state, API key) rather than default values.
+  final appState = AppState();
+  await appState.init();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState()..init(),
+    ChangeNotifierProvider.value(
+      value: appState,
       child: const CalNovaApp(),
     ),
   );
@@ -209,9 +214,19 @@ class _AuthGateState extends State<AuthGate> {
     return StreamBuilder(
       stream: SupabaseService.authStateChanges,
       builder: (context, snapshot) {
-        // Show AppShell while stream is initializing (avoids flicker)
+        // H-4: Show a neutral loading scaffold while the auth stream initialises.
+        // Previously returned AppShell, which exposed the full UI to unauthenticated
+        // users during the brief connection-waiting window.
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const AppShell();
+          return const Scaffold(
+            backgroundColor: CLColors.bg,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: CLColors.accent,
+                strokeWidth: 2,
+              ),
+            ),
+          );
         }
 
         // Check for password recovery event

@@ -227,7 +227,9 @@ class _ScanScreenState extends State<ScanScreen>
     }
   }
 
-  void _logMeal() async {
+  // M-7: Changed from `void async` to `Future<void>` so errors are not silently
+  // discarded; wrapped body in try/catch to show a snackbar on storage failure.
+  Future<void> _logMeal() async {
     final r = _result;
     if (r == null) return;
     final now = TimeOfDay.now();
@@ -243,37 +245,50 @@ class _ScanScreenState extends State<ScanScreen>
       fiber: r.fiberG,
     );
     final state = context.read<AppState>();
-    await state.addEntry(entry);
+    try {
+      await state.addEntry(entry);
 
-    // Track scan if AI was used for barcode fallback (deferred from _aiEstimateFromBarcode)
-    if (_pendingAiScanTrack) {
-      await state.trackScan();
-      _pendingAiScanTrack = false;
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${r.mealName} logged — ${r.totalCalories} Cal'),
-          backgroundColor: CLColors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-      setState(() {
-        _result = null;
-        _imageBytes = null;
-        _secondImageBytes = null;
-        _error = null;
-        _textCtrl.clear();
-        _barcodeScanned = false;
-        _scannedBarcode = null;
-        _barcodeResult = null;
-        _showServingPicker = false;
+      // Track scan if AI was used for barcode fallback (deferred from _aiEstimateFromBarcode)
+      if (_pendingAiScanTrack) {
+        await state.trackScan();
         _pendingAiScanTrack = false;
-      });
-      _resultAnim.reset();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${r.mealName} logged — ${r.totalCalories} Cal'),
+            backgroundColor: CLColors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        setState(() {
+          _result = null;
+          _imageBytes = null;
+          _secondImageBytes = null;
+          _error = null;
+          _textCtrl.clear();
+          _barcodeScanned = false;
+          _scannedBarcode = null;
+          _barcodeResult = null;
+          _showServingPicker = false;
+          _pendingAiScanTrack = false;
+        });
+        _resultAnim.reset();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to log meal: ${friendlyError(e)}'),
+            backgroundColor: CLColors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
     }
   }
 
@@ -1906,205 +1921,18 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   // ── RESULT PANEL ────────────────────────────────────────────────────────
+  // H-3: Delegated to _EditSheet StatefulWidget so TextEditingControllers are
+  // guaranteed to be disposed in its dispose() when the sheet closes for any reason.
   void _showEditSheet(ScanResult r) {
-    // One text controller and one integer quantity per item
-    final nameCtrls = r.items
-        .map((item) => TextEditingController(text: item.name))
-        .toList();
-    final quantities = List<int>.filled(r.items.length, 1);
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: CLColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (sheetCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                  left: 20,
-                  right: 20,
-                  top: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Correct Food Items',
-                        style: TextStyle(
-                            color: CLColors.text,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Fix the names and adjust each item\'s quantity independently.',
-                      style: TextStyle(color: CLColors.muted, fontSize: 12),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // ── Per-item rows (name + individual qty stepper) ─────
-                    ...List.generate(nameCtrls.length, (i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Text('${i + 1}.',
-                                    style: const TextStyle(
-                                        color: CLColors.accent,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600)),
-                              ),
-                              Expanded(
-                                child: TextField(
-                                  controller: nameCtrls[i],
-                                  style: const TextStyle(
-                                      color: CLColors.text, fontSize: 14),
-                                  decoration: InputDecoration(
-                                    hintText: 'Food item ${i + 1}',
-                                    isDense: true,
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(
-                                            vertical: 10, horizontal: 12),
-                                  ),
-                                ),
-                              ),
-                              if (nameCtrls.length > 1)
-                                IconButton(
-                                  icon: const Icon(Icons.close,
-                                      size: 16, color: CLColors.muted),
-                                  onPressed: () {
-                                    final ctrl = nameCtrls[i];
-                                    setSheetState(() {
-                                      nameCtrls.removeAt(i);
-                                      quantities.removeAt(i);
-                                    });
-                                    ctrl.dispose();
-                                  },
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                      minWidth: 32, minHeight: 32),
-                                ),
-                            ],
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 22, top: 6),
-                            child: Row(
-                              children: [
-                                const Text('Qty:',
-                                    style: TextStyle(
-                                        color: CLColors.muted, fontSize: 11)),
-                                const SizedBox(width: 6),
-                                _qtyButton(Icons.remove, () {
-                                  if (quantities[i] > 1) {
-                                    setSheetState(() => quantities[i]--);
-                                  }
-                                }),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8),
-                                  child: Text('${quantities[i]}',
-                                      style: TextStyle(
-                                          color: quantities[i] > 1
-                                              ? CLColors.accent
-                                              : CLColors.text,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700)),
-                                ),
-                                _qtyButton(Icons.add, () {
-                                  setSheetState(() => quantities[i]++);
-                                }),
-                                if (quantities[i] > 1)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 8),
-                                    child: Text(
-                                      'x${quantities[i]} — scales automatically',
-                                      style: const TextStyle(
-                                          color: CLColors.muted,
-                                          fontSize: 10),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
-
-                    TextButton.icon(
-                      onPressed: () {
-                        setSheetState(() {
-                          nameCtrls.add(TextEditingController());
-                          quantities.add(1);
-                        });
-                      },
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Add item'),
-                      style: TextButton.styleFrom(
-                          foregroundColor: CLColors.accent,
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 8)),
-                    ),
-
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Build parallel lists: name + qty, skipping blank entries
-                          final entries = <MapEntry<String, int>>[];
-                          for (int i = 0; i < nameCtrls.length; i++) {
-                            final t = nameCtrls[i].text.trim();
-                            if (t.isNotEmpty) entries.add(MapEntry(t, quantities[i]));
-                          }
-                          if (entries.isEmpty) return;
-                          final names = entries.map((e) => e.key).toList();
-                          final qtys = entries.map((e) => e.value).toList();
-                          Navigator.pop(ctx);
-                          _reAnalyse(names, qtys, r);
-                        },
-                        icon: const Icon(Icons.auto_fix_high, size: 18),
-                        label: const Text('RE-ANALYSE',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1)),
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: CLColors.accent,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _qtyButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: CLColors.surface2,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: CLColors.border),
-        ),
-        child: Icon(icon, size: 14, color: CLColors.accent),
+      builder: (_) => _EditSheet(
+        result: r,
+        onReanalyse: (names, qtys) => _reAnalyse(names, qtys, r),
       ),
     );
   }
@@ -2164,7 +1992,7 @@ class _ScanScreenState extends State<ScanScreen>
           scaledItems.add(item.copyWith(
             calories: scaledCal,
             weightG: item.weightG != null ? item.weightG! * qty : null,
-            portion: '${qty}x \${item.portion}',
+            portion: '${qty}x ${item.portion}',
           ));
           totalCal += scaledCal;
         }
@@ -2395,4 +2223,225 @@ class _DashedCirclePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Edit sheet (H-3: proper controller disposal) ──────────────────────────────
+/// Bottom sheet for correcting food item names and quantities.
+/// Using a StatefulWidget ensures every TextEditingController is disposed in
+/// [dispose()] regardless of how the sheet is closed (back gesture, tap outside,
+/// programmatic Navigator.pop, etc.).
+class _EditSheet extends StatefulWidget {
+  final ScanResult result;
+  final void Function(List<String> names, List<int> quantities) onReanalyse;
+
+  const _EditSheet({required this.result, required this.onReanalyse});
+
+  @override
+  State<_EditSheet> createState() => _EditSheetState();
+}
+
+class _EditSheetState extends State<_EditSheet> {
+  late final List<TextEditingController> _nameCtrls;
+  late final List<int> _quantities;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrls = widget.result.items
+        .map((item) => TextEditingController(text: item.name))
+        .toList();
+    _quantities = List<int>.filled(widget.result.items.length, 1);
+  }
+
+  @override
+  void dispose() {
+    // Guaranteed disposal regardless of how the sheet closes.
+    for (final c in _nameCtrls) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Widget _qtyButton(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: CLColors.surface2,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: CLColors.border),
+        ),
+        child: Icon(icon, size: 14, color: CLColors.accent),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 20,
+          right: 20,
+          top: 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Correct Food Items',
+                style: TextStyle(
+                    color: CLColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            const Text(
+              'Fix the names and adjust each item\'s quantity independently.',
+              style: TextStyle(color: CLColors.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Per-item rows ─────────────────────────────────────────────
+            ...List.generate(_nameCtrls.length, (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text('${i + 1}.',
+                            style: const TextStyle(
+                                color: CLColors.accent,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _nameCtrls[i],
+                          style: const TextStyle(
+                              color: CLColors.text, fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: 'Food item ${i + 1}',
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 12),
+                          ),
+                        ),
+                      ),
+                      if (_nameCtrls.length > 1)
+                        IconButton(
+                          icon: const Icon(Icons.close,
+                              size: 16, color: CLColors.muted),
+                          onPressed: () {
+                            // Remove from both lists and trigger rebuild first.
+                            final removed = _nameCtrls.removeAt(i);
+                            setState(() => _quantities.removeAt(i));
+                            // Defer disposal until after the frame so the
+                            // controller is no longer attached to a TextField.
+                            // Disposing while attached fires _handleControllerChanged
+                            // on a dead controller, causing the visible lag.
+                            WidgetsBinding.instance.addPostFrameCallback(
+                                (_) => removed.dispose());
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(minWidth: 32, minHeight: 32),
+                        ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 22, top: 6),
+                    child: Row(
+                      children: [
+                        const Text('Qty:',
+                            style: TextStyle(
+                                color: CLColors.muted, fontSize: 11)),
+                        const SizedBox(width: 6),
+                        _qtyButton(Icons.remove, () {
+                          if (_quantities[i] > 1) {
+                            setState(() => _quantities[i]--);
+                          }
+                        }),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('${_quantities[i]}',
+                              style: TextStyle(
+                                  color: _quantities[i] > 1
+                                      ? CLColors.accent
+                                      : CLColors.text,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                        _qtyButton(Icons.add, () {
+                          setState(() => _quantities[i]++);
+                        }),
+                        if (_quantities[i] > 1)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text(
+                              'x${_quantities[i]} — scales automatically',
+                              style: const TextStyle(
+                                  color: CLColors.muted, fontSize: 10),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )),
+
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _nameCtrls.add(TextEditingController());
+                  _quantities.add(1);
+                });
+              },
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add item'),
+              style: TextButton.styleFrom(
+                  foregroundColor: CLColors.accent,
+                  padding: const EdgeInsets.symmetric(horizontal: 8)),
+            ),
+
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  final entries = <MapEntry<String, int>>[];
+                  for (int i = 0; i < _nameCtrls.length; i++) {
+                    final t = _nameCtrls[i].text.trim();
+                    if (t.isNotEmpty) entries.add(MapEntry(t, _quantities[i]));
+                  }
+                  if (entries.isEmpty) return;
+                  Navigator.pop(context);
+                  widget.onReanalyse(
+                    entries.map((e) => e.key).toList(),
+                    entries.map((e) => e.value).toList(),
+                  );
+                },
+                icon: const Icon(Icons.auto_fix_high, size: 18),
+                label: const Text('RE-ANALYSE',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: CLColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
 }

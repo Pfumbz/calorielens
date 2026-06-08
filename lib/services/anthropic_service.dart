@@ -17,7 +17,8 @@ class AnthropicService {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': _version,
-        'anthropic-dangerous-direct-browser-access': 'true',
+        // L-3: Removed 'anthropic-dangerous-direct-browser-access' — only needed
+        // for browser/WASM builds; unnecessary and misleading in an Android app.
       };
 
   // ── Image scan prompts ────────────────────────────────────────────
@@ -51,6 +52,19 @@ INSTRUCTIONS:
 Respond ONLY in this exact JSON format (no markdown, no backticks, no explanation):
 {"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}''';
 
+  // ── Input sanitization ────────────────────────────────────────────
+  /// M-4: Sanitizes user-supplied text before embedding it in an AI prompt.
+  /// Strips newlines (used for prompt injection), normalises quotes, and caps length.
+  static String _sanitizeForPrompt(String input, {int maxLength = 300}) {
+    return input
+        .replaceAll('\r\n', ' ')
+        .replaceAll('\n', ' ')
+        .replaceAll('\r', ' ')
+        .replaceAll('"', "'")  // avoid breaking JSON-like context in prompts
+        .trim()
+        .substring(0, input.length.clamp(0, maxLength));
+  }
+
   // ── Scan image (single or multi-angle) ──────────────────────────
   Future<ScanResult> scanImage(Uint8List imageBytes, String mediaType) async {
     final (result, _) = await scanImageWithRaw([imageBytes], [mediaType]);
@@ -72,15 +86,18 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
     String prompt;
     if (correctionHint != null) {
       final ctx = originalContext;
+      // M-4: Sanitize user input before embedding in prompt to prevent injection.
+      final safeHint = _sanitizeForPrompt(correctionHint);
+      final safeOrigName = _sanitizeForPrompt(ctx?['name']?.toString() ?? 'Unknown');
       prompt = '''You are an expert nutritionist. The user has CORRECTED a food identification mistake made by the AI.
 
 ⚠️ OVERRIDE IN EFFECT — THE USER'S CORRECTION IS THE GROUND TRUTH ⚠️
 The AI previously misidentified the food. The user is now telling you what it actually is.
 You MUST trust the user's correction completely. Do NOT use the photo to re-identify the food — the photo is ONLY for estimating portion size (weight in grams).
 
-CORRECTED FOOD NAME(S): "$correctionHint"
+CORRECTED FOOD NAME(S): "$safeHint"
 
-WHAT THE AI PREVIOUSLY (WRONGLY) CALLED IT: ${ctx?['name'] ?? 'Unknown'}
+WHAT THE AI PREVIOUSLY (WRONGLY) CALLED IT: $safeOrigName
 — Ignore this. The user says it is wrong.
 
 RULE 1 — FOOD IDENTITY: The corrected name above is what the food IS. Accept it without question. Never revert to the old name or let the photo override it.
@@ -88,7 +105,7 @@ RULE 2 — SINGLE UNIT: Return nutrition for EXACTLY ONE unit/serving. Ignore an
 RULE 3 — PHOTO USE: Use the photo ONLY to estimate the weight in grams of one unit/serving of the corrected food. Nothing else.
 
 INSTRUCTIONS:
-1. Look up nutrition data for "${correctionHint}" — this is the food, full stop.
+1. Look up nutrition data for "$safeHint" — this is the food, full stop.
 2. Use the photo to estimate weight_g of ONE serving of that food as it appears on the plate.
 3. Calculate calories and macros from the corrected food's nutrition data × estimated weight.
 4. For EACH item, provide a usda_query — a simple generic English name for USDA lookup.
@@ -199,6 +216,8 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
     // Build the same prompt as scanText
     String prompt;
     if (originalContext != null) {
+      // M-4: Sanitize user-supplied description before embedding in prompt.
+      final safeDesc = _sanitizeForPrompt(description);
       prompt =
           '''You are an expert nutritionist. The user previously scanned a meal and is now correcting it.
 
@@ -207,7 +226,7 @@ ORIGINAL ANALYSIS:
 - Calories: ${originalContext['calories'] ?? '?'} kcal
 - Protein: ${originalContext['protein'] ?? '?'}g | Carbs: ${originalContext['carbs'] ?? '?'}g | Fat: ${originalContext['fat'] ?? '?'}g | Fiber: ${originalContext['fiber'] ?? '?'}g
 
-The user says the meal should actually be: "$description"
+The user says the meal should actually be: "$safeDesc"
 
 INSTRUCTIONS:
 1. Compare the user's corrected description to the original analysis above.

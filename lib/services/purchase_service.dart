@@ -205,13 +205,29 @@ class PurchaseService {
 
   /// Verify the purchase and deliver premium access.
   ///
-  /// In production, you should verify the purchase token server-side
-  /// via Google Play Developer API. For now, we trust the client-side
-  /// verification from the in_app_purchase plugin.
+  /// C-1: Added client-side token guard so a spoofed `purchased` event with an
+  /// empty verification token is rejected before premium is granted.
+  ///
+  /// IMPORTANT — TODO for server-side verification:
+  ///   1. Create a Supabase Edge Function (e.g. /functions/v1/verify-purchase)
+  ///   2. POST `purchase.verificationData.serverVerificationData` to it
+  ///   3. The function calls the Google Play Developer API:
+  ///      GET /purchases/subscriptions/{productId}/tokens/{purchaseToken}
+  ///   4. Only grant premium if the response shows a valid, not-expired subscription
+  ///   This prevents offline purchase spoofing entirely.
   Future<void> _verifyAndDeliver(iap.PurchaseDetails purchase, {bool isRestore = false}) async {
-    // TODO: For production, add server-side verification:
-    // Send purchase.verificationData.serverVerificationData to a Supabase
-    // Edge Function that calls the Google Play Developer API to verify.
+    // Client-side guard: reject purchases with an empty verification token.
+    // A legitimate Play Billing purchase always carries a non-empty token.
+    final token = purchase.verificationData.serverVerificationData;
+    if (token.isEmpty) {
+      debugPrint('PurchaseService: Rejected purchase — empty verification token');
+      _lastError = 'Purchase could not be verified. Please try again.';
+      _stateController.add(ProPurchaseState.error);
+      if (purchase.pendingCompletePurchase) {
+        await _iapInstance.completePurchase(purchase);
+      }
+      return;
+    }
 
     _isProActive = true;
     onPremiumChanged?.call(true);

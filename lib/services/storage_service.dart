@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/models.dart';
 
 String _dateKey(DateTime d) =>
@@ -12,13 +13,40 @@ class StorageService {
 
   late SharedPreferences _prefs;
 
+  // Secure storage for sensitive values (uses Android Keystore / iOS Keychain).
+  static const _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    // One-time migration: move legacy plain-text API key into secure storage.
+    await _migrateApiKey();
   }
 
-  // ── API Key ───────────────────────────────────────────────────────
-  String get apiKey => _prefs.getString('cl_api_key') ?? '';
-  Future<void> saveApiKey(String key) => _prefs.setString('cl_api_key', key);
+  /// Migrates a key previously stored in SharedPreferences into secure storage,
+  /// then removes the plain-text copy. Safe to call on every init — no-ops once done.
+  Future<void> _migrateApiKey() async {
+    final legacyKey = _prefs.getString('cl_api_key');
+    if (legacyKey != null && legacyKey.isNotEmpty) {
+      await _secure.write(key: 'cl_api_key', value: legacyKey);
+      await _prefs.remove('cl_api_key');
+    }
+  }
+
+  // ── API Key (stored in encrypted secure storage) ──────────────────
+  /// Async — reads from Android Keystore / iOS Keychain.
+  Future<String> getApiKey() async {
+    return await _secure.read(key: 'cl_api_key') ?? '';
+  }
+
+  Future<void> saveApiKey(String key) async {
+    if (key.isEmpty) {
+      await _secure.delete(key: 'cl_api_key');
+    } else {
+      await _secure.write(key: 'cl_api_key', value: key);
+    }
+  }
 
   // ── Premium ───────────────────────────────────────────────────────
   bool get isPremium => _prefs.getString('cl5_premium') == '1';
@@ -107,10 +135,16 @@ class StorageService {
     return pruned;
   }
 
-  /// Also prune old water and scan count keys to keep storage clean.
+  /// Also prune old water, scan count, health, and cloud-cache keys.
   Future<void> pruneOldMeta({required int retainDays}) async {
     final cutoff = DateTime.now().subtract(Duration(days: retainDays));
-    final prefixes = ['cl5_water_', 'cl5_scans_'];
+    // Expanded: also prune health and cloud-counter date-keyed entries that
+    // previously accumulated indefinitely.
+    final prefixes = [
+      'cl5_water_', 'cl5_scans_',
+      'cl6_health_steps_', 'cl6_health_cal_',
+      'cl6_cloud_scans_', 'cl6_cloud_chats_',
+    ];
     for (final prefix in prefixes) {
       final keys = _prefs.getKeys().where((k) => k.startsWith(prefix)).toList();
       for (final key in keys) {

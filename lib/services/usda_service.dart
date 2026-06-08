@@ -96,23 +96,25 @@ class UsdaService {
     }
   }
 
-  /// Look up multiple foods in parallel, returning a map of query → nutrition.
+  /// Look up multiple foods in batches, returning a map of query → nutrition.
   /// Items that fail to match are omitted from the result.
+  ///
+  /// M-6: Processes [_batchSize] queries at a time to honour USDA rate limits.
+  /// Previously fired all requests simultaneously despite the "max 5" comment.
+  static const int _batchSize = 4;
+
   static Future<Map<String, UsdaNutrition>> lookupFoods(
     List<String> queries,
   ) async {
     final results = <String, UsdaNutrition>{};
 
-    // Run lookups in parallel (max 5 concurrent to respect rate limits)
-    final futures = <Future<void>>[];
-    for (final query in queries) {
-      futures.add(
-        lookupFood(query).then((nutrition) {
-          if (nutrition != null) results[query] = nutrition;
-        }),
-      );
+    for (int i = 0; i < queries.length; i += _batchSize) {
+      final batch = queries.skip(i).take(_batchSize).toList();
+      await Future.wait(batch.map((query) async {
+        final nutrition = await lookupFood(query);
+        if (nutrition != null) results[query] = nutrition;
+      }));
     }
-    await Future.wait(futures);
     return results;
   }
 
