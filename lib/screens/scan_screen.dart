@@ -2281,6 +2281,11 @@ class _EditSheetState extends State<_EditSheet> {
 
             // ── Per-item rows ─────────────────────────────────────────────
             ...List.generate(_nameCtrls.length, (i) => Padding(
+              // ValueKey lets Flutter identify each row by its controller
+              // identity, so removing/adding one item only diffs that single
+              // row rather than tearing down and rebuilding every TextField
+              // after the changed index.
+              key: ValueKey(_nameCtrls[i]),
               padding: const EdgeInsets.only(bottom: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2313,13 +2318,17 @@ class _EditSheetState extends State<_EditSheet> {
                           icon: const Icon(Icons.close,
                               size: 16, color: CLColors.muted),
                           onPressed: () {
-                            // Remove from both lists and trigger rebuild first.
-                            final removed = _nameCtrls.removeAt(i);
-                            setState(() => _quantities.removeAt(i));
-                            // Defer disposal until after the frame so the
-                            // controller is no longer attached to a TextField.
-                            // Disposing while attached fires _handleControllerChanged
-                            // on a dead controller, causing the visible lag.
+                            // Both mutations in one setState so the rebuild
+                            // sees a consistent list length.
+                            late final TextEditingController removed;
+                            setState(() {
+                              removed = _nameCtrls.removeAt(i);
+                              _quantities.removeAt(i);
+                            });
+                            // Defer disposal until after the rebuild —
+                            // disposing while the TextField is still in the
+                            // tree fires _handleControllerChanged on a dead
+                            // controller and causes the visible lag.
                             WidgetsBinding.instance.addPostFrameCallback(
                                 (_) => removed.dispose());
                           },
