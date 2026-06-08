@@ -2256,37 +2256,40 @@ class _EditSheetState extends State<_EditSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final maxListHeight = MediaQuery.of(context).size.height * 0.45;
     return Padding(
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
           left: 20,
           right: 20,
           top: 20),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Correct Food Items',
-                style: TextStyle(
-                    color: CLColors.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            const Text(
-              'Fix the names and adjust each item\'s quantity independently.',
-              style: TextStyle(color: CLColors.muted, fontSize: 12),
-            ),
-            const SizedBox(height: 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Correct Food Items',
+              style: TextStyle(
+                  color: CLColors.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          const Text(
+            'Fix the names and adjust each item\'s quantity independently.',
+            style: TextStyle(color: CLColors.muted, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
 
-            // ── Per-item rows ─────────────────────────────────────────────
-            ...List.generate(_nameCtrls.length, (i) => Padding(
-              // ValueKey lets Flutter identify each row by its controller
-              // identity, so removing/adding one item only diffs that single
-              // row rather than tearing down and rebuilding every TextField
-              // after the changed index.
-              key: ValueKey(_nameCtrls[i]),
-              padding: const EdgeInsets.only(bottom: 10),
+          // Item list — scrollable independently so footer buttons stay
+          // outside the scroll area and are never obscured by gesture
+          // competition between SingleChildScrollView and the buttons.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxListHeight),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: List.generate(_nameCtrls.length, (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2379,53 +2382,58 @@ class _EditSheetState extends State<_EditSheet> {
                 ],
               ),
             )),
-
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _nameCtrls.add(TextEditingController());
-                  _quantities.add(1);
-                });
-              },
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add item'),
-              style: TextButton.styleFrom(
-                  foregroundColor: CLColors.accent,
-                  padding: const EdgeInsets.symmetric(horizontal: 8)),
-            ),
-
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  final entries = <MapEntry<String, int>>[];
-                  for (int i = 0; i < _nameCtrls.length; i++) {
-                    final t = _nameCtrls[i].text.trim();
-                    if (t.isNotEmpty) entries.add(MapEntry(t, _quantities[i]));
-                  }
-                  if (entries.isEmpty) return;
-                  Navigator.pop(context);
-                  widget.onReanalyse(
-                    entries.map((e) => e.key).toList(),
-                    entries.map((e) => e.value).toList(),
-                  );
-                },
-                icon: const Icon(Icons.auto_fix_high, size: 18),
-                label: const Text('RE-ANALYSE',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1)),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: CLColors.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
               ),
             ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+
+          // Footer buttons are outside the scroll area so they have no
+          // gesture competition with SingleChildScrollView — taps are
+          // always registered immediately.
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _nameCtrls.add(TextEditingController());
+                _quantities.add(1);
+              });
+            },
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('Add item'),
+            style: TextButton.styleFrom(
+                foregroundColor: CLColors.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 8)),
+          ),
+
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final entries = <MapEntry<String, int>>[];
+                for (int i = 0; i < _nameCtrls.length; i++) {
+                  final t = _nameCtrls[i].text.trim();
+                  if (t.isNotEmpty) entries.add(MapEntry(t, _quantities[i]));
+                }
+                if (entries.isEmpty) return;
+                Navigator.pop(context);
+                widget.onReanalyse(
+                  entries.map((e) => e.key).toList(),
+                  entries.map((e) => e.value).toList(),
+                );
+              },
+              icon: const Icon(Icons.auto_fix_high, size: 18),
+              label: const Text('RE-ANALYSE',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: CLColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14)),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
