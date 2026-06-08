@@ -2219,6 +2219,12 @@ class _EditSheet extends StatefulWidget {
 class _EditSheetState extends State<_EditSheet> {
   late final List<TextEditingController> _nameCtrls;
   late final List<int> _quantities;
+  // One focus node per row, kept length-matched with _nameCtrls. Lets us move
+  // the cursor straight to a newly added field instead of making the user
+  // scroll to find it.
+  late final List<FocusNode> _focusNodes;
+  // Drives the item list's scroll position so a new row can be revealed.
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -2230,6 +2236,8 @@ class _EditSheetState extends State<_EditSheet> {
     // makes _quantities.add()/removeAt() throw, breaking Add/Delete and
     // corrupting list-length parity with _nameCtrls. generate() is growable.
     _quantities = List<int>.generate(widget.result.items.length, (_) => 1);
+    _focusNodes =
+        List<FocusNode>.generate(widget.result.items.length, (_) => FocusNode());
   }
 
   @override
@@ -2238,6 +2246,10 @@ class _EditSheetState extends State<_EditSheet> {
     for (final c in _nameCtrls) {
       c.dispose();
     }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -2288,6 +2300,7 @@ class _EditSheetState extends State<_EditSheet> {
           ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxListHeight),
             child: SingleChildScrollView(
+              controller: _scrollController,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2317,6 +2330,7 @@ class _EditSheetState extends State<_EditSheet> {
                       Expanded(
                         child: TextField(
                           controller: _nameCtrls[i],
+                          focusNode: _focusNodes[i],
                           style: const TextStyle(
                               color: CLColors.text, fontSize: 14),
                           decoration: InputDecoration(
@@ -2332,19 +2346,23 @@ class _EditSheetState extends State<_EditSheet> {
                           icon: const Icon(Icons.close,
                               size: 16, color: CLColors.muted),
                           onPressed: () {
-                            // Both mutations in one setState so the rebuild
-                            // sees a consistent list length.
+                            // All three mutations in one setState so the rebuild
+                            // sees consistent list lengths.
                             late final TextEditingController removed;
+                            late final FocusNode removedNode;
                             setState(() {
                               removed = _nameCtrls.removeAt(i);
                               _quantities.removeAt(i);
+                              removedNode = _focusNodes.removeAt(i);
                             });
                             // Defer disposal until after the rebuild —
                             // disposing while the TextField is still in the
                             // tree fires _handleControllerChanged on a dead
                             // controller and causes the visible lag.
-                            WidgetsBinding.instance.addPostFrameCallback(
-                                (_) => removed.dispose());
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              removed.dispose();
+                              removedNode.dispose();
+                            });
                           },
                           padding: EdgeInsets.zero,
                           constraints:
@@ -2402,9 +2420,23 @@ class _EditSheetState extends State<_EditSheet> {
           // always registered immediately.
           TextButton.icon(
             onPressed: () {
+              final newNode = FocusNode();
               setState(() {
                 _nameCtrls.add(TextEditingController());
                 _quantities.add(1);
+                _focusNodes.add(newNode);
+              });
+              // After the new row is laid out, scroll it into view and focus
+              // it so the cursor lands in the empty field — no manual scrolling.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_scrollController.hasClients) {
+                  _scrollController.animateTo(
+                    _scrollController.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                }
+                newNode.requestFocus();
               });
             },
             icon: const Icon(Icons.add, size: 16),
