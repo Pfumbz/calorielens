@@ -1499,35 +1499,11 @@ class _ScanScreenState extends State<ScanScreen>
 
   Widget _buildCategoryGroup(
       BuildContext context, AppState state, String category, List<DiaryEntry> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Category header
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              Container(
-                width: 3, height: 14,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: CLColors.accent,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Text(category,
-                  style: const TextStyle(
-                      color: CLColors.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3)),
-            ],
-          ),
-        ),
-        // Meal cards
-        ...items.map((entry) => _buildRecentMealCard(context, state, entry)),
-        const SizedBox(height: 14),
-      ],
+    return _CategoryGroup(
+      category: category,
+      cards: items
+          .map((entry) => _buildRecentMealCard(context, state, entry))
+          .toList(),
     );
   }
 
@@ -2442,6 +2418,88 @@ class _EditSheetState extends State<_EditSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Expandable category group for the Recent Meals tab.
+// Each instance manages its own collapsed/expanded state so categories
+// can be toggled independently without touching parent state.
+class _CategoryGroup extends StatefulWidget {
+  final String category;
+  final List<Widget> cards;
+
+  const _CategoryGroup({required this.category, required this.cards});
+
+  @override
+  State<_CategoryGroup> createState() => _CategoryGroupState();
+}
+
+class _CategoryGroupState extends State<_CategoryGroup> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _expanded = !_expanded),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 14,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: CLColors.accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(widget.category,
+                    style: const TextStyle(
+                        color: CLColors.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: CLColors.surface2,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "${widget.cards.length}",
+                    style: const TextStyle(
+                        color: CLColors.muted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                AnimatedRotation(
+                  turns: _expanded ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.chevron_right,
+                      color: CLColors.muted, size: 18),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          child: _expanded
+              ? Column(children: widget.cards)
+              : const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 14),
+      ],
     );
   }
 }
