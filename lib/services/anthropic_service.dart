@@ -56,13 +56,17 @@ Respond ONLY in this exact JSON format (no markdown, no backticks, no explanatio
   /// M-4: Sanitizes user-supplied text before embedding it in an AI prompt.
   /// Strips newlines (used for prompt injection), normalises quotes, and caps length.
   static String _sanitizeForPrompt(String input, {int maxLength = 300}) {
-    return input
-        .replaceAll('\r\n', ' ')
-        .replaceAll('\n', ' ')
-        .replaceAll('\r', ' ')
-        .replaceAll('"', "'")  // avoid breaking JSON-like context in prompts
-        .trim()
-        .substring(0, input.length.clamp(0, maxLength));
+    // Collapse all newline variants, neutralise quotes, then trim.
+    final cleaned = input
+        .replaceAll(RegExp(r'[\r\n]+'), ' ')
+        .replaceAll('"', "'") // avoid breaking JSON-like context in prompts
+        .trim();
+    // Cap length using the CLEANED string's length — using the original
+    // input.length here would throw RangeError whenever trimming/collapsing
+    // shortened the string (e.g. trailing whitespace like "chicken ").
+    return cleaned.length <= maxLength
+        ? cleaned
+        : cleaned.substring(0, maxLength);
   }
 
   // ── Scan image (single or multi-angle) ──────────────────────────
@@ -135,7 +139,7 @@ Respond ONLY in this exact JSON format (no markdown, no backticks):
 
     final body = jsonEncode({
       'model': _modelVision,
-      'max_tokens': 1024,
+      'max_tokens': 2048, // headroom so large meals don't truncate the JSON
       'messages': [
         {'role': 'user', 'content': content}
       ]
@@ -381,7 +385,7 @@ Be specific (e.g. "chicken thighs" not just "meat", "cheddar cheese" not just "c
     final b64 = base64Encode(imageBytes);
     final body = jsonEncode({
       'model': _modelVision,
-      'max_tokens': 1024,
+      'max_tokens': 2048, // headroom so large meals don't truncate the JSON
       'messages': [
         {
           'role': 'user',

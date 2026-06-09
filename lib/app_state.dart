@@ -196,15 +196,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       _startHealthTimer();
     }
 
-    // Initialise in-app purchases and listen for subscription changes
+    // Initialise in-app purchases and listen for subscription changes.
+    // Entitlement is server-decided: the verify-purchase Edge Function is the
+    // only thing that can set is_premium (the DB rejects client writes). We
+    // only mirror the result into local state for offline UI.
     _purchases.onPremiumChanged = (isPremium) async {
       _isPremium = isPremium;
       await _storage.setPremium(isPremium);
-      if (isSignedIn) {
-        unawaited(SupabaseService.updateProfile({'is_premium': isPremium}));
-      }
       notifyListeners();
     };
+    _purchases.verifyPurchase = (token, productId) =>
+        backend.verifyPurchase(purchaseToken: token, productId: productId);
     unawaited(_purchases.init());
 
     // Prune old diary entries based on user tier
@@ -397,7 +399,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         'sex': _profile.sex,
         'activity': _profile.activity,
         'calorie_goal': _calorieGoal,
-        'is_premium': _isPremium,
+        // NB: is_premium is intentionally NOT written here — entitlement is
+        // server-owned (set only by the verify-purchase Edge Function).
       });
     } catch (_) {
       // Migration failed silently — will retry next sign-in
@@ -564,23 +567,20 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Access the purchase service (for UI to trigger purchases).
   PurchaseService get purchases => _purchases;
 
-  /// Activate premium (called by PurchaseService callback or for BYOK users).
+  /// Mirror premium state into local storage for offline UI.
+  /// NB: entitlement is server-owned — these do NOT write is_premium to the
+  /// cloud (the DB rejects client writes). The authoritative value comes back
+  /// via _refreshFromCloud / verify-purchase.
   Future<void> activatePremium() async {
     await _storage.setPremium(true);
     _isPremium = true;
-    if (isSignedIn) {
-      unawaited(SupabaseService.updateProfile({'is_premium': true}));
-    }
     notifyListeners();
   }
 
-  /// Cancel premium locally (subscription cancellation is handled via Play Store).
+  /// Clear premium locally (actual subscription state is owned by the server).
   Future<void> cancelPremium() async {
     await _storage.setPremium(false);
     _isPremium = false;
-    if (isSignedIn) {
-      unawaited(SupabaseService.updateProfile({'is_premium': false}));
-    }
     notifyListeners();
   }
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'services/supabase_service.dart';
@@ -393,6 +395,29 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
 
+  /// Set true when the installed build is below the server's minimum supported
+  /// build. Fails open: any error / offline leaves the app usable.
+  bool _updateRequired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkMinVersion();
+  }
+
+  Future<void> _checkMinVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final current = int.tryParse(info.buildNumber) ?? 0;
+      final min = await SupabaseService.fetchMinSupportedBuild();
+      if (min != null && current > 0 && current < min && mounted) {
+        setState(() => _updateRequired = true);
+      }
+    } catch (_) {
+      // fail open — never lock a user out due to a config/network error
+    }
+  }
+
   static const _screens = [
     ScanScreen(),
     TodayScreen(),
@@ -431,6 +456,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_updateRequired) return const ForceUpdateScreen();
     return PopScope(
       // Always intercept back — statics like ScanScreen.isOnPhotoMode can
       // change without triggering an AppShell rebuild, so canPop must stay
@@ -475,6 +501,77 @@ class _AppShellState extends State<AppShell> {
         ),
       ),
     ),
+    );
+  }
+}
+
+// ─── FORCE UPDATE SCREEN ──────────────────────────────────────────────────────
+/// Blocking screen shown when the installed build is below the server-configured
+/// minimum supported build (`app_config.min_supported_build`). Used to retire
+/// older versions whose purchase flow predates server-side entitlement.
+class ForceUpdateScreen extends StatelessWidget {
+  const ForceUpdateScreen({super.key});
+
+  static const _packageId = 'com.pcmacstudios.calorielens';
+
+  Future<void> _openStore() async {
+    // Prefer the Play Store app; fall back to the web listing.
+    final market = Uri.parse('market://details?id=$_packageId');
+    final web = Uri.parse(
+        'https://play.google.com/store/apps/details?id=$_packageId');
+    if (!await launchUrl(market, mode: LaunchMode.externalApplication)) {
+      await launchUrl(web, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: CLColors.bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.system_update, size: 64, color: CLColors.accent),
+                const SizedBox(height: 24),
+                const Text(
+                  'Update required',
+                  style: TextStyle(
+                    color: CLColors.text,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'A newer version of CalNova is available with important '
+                  'improvements. Please update to continue.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: CLColors.muted, fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _openStore,
+                    icon: const Icon(Icons.shop, size: 18),
+                    label: const Text('Update now',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CLColors.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

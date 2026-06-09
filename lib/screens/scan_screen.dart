@@ -213,9 +213,11 @@ class _ScanScreenState extends State<ScanScreen>
         );
       }
       await state.trackScan();
+      if (!mounted) return; // a scan can take 30–45s; guard against disposal
       setState(() { _result = res; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
     } catch (e) {
+      if (!mounted) return;
       setState(
           () => _error = friendlyError(e));
       // Refresh usage from server so UI counter stays accurate after errors
@@ -223,7 +225,7 @@ class _ScanScreenState extends State<ScanScreen>
         state.refreshUsage();
       }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -1997,11 +1999,12 @@ class _ScanScreenState extends State<ScanScreen>
         overallNotes: oneUnit.overallNotes,
       );
 
+      if (!mounted) return; // re-analyse can take 30–45s; guard against disposal
       setState(() { _result = result; _loading = false; _updateResultFlag(); });
       _resultAnim.forward(from: 0);
     } catch (e) {
-      setState(() => _loading = false);
       if (!mounted) return;
+      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(friendlyError(e)),

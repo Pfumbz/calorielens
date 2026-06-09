@@ -228,6 +228,27 @@ class BackendService {
     return data['response'] as String? ?? '';
   }
 
+  // ── Purchase verification (server-side entitlement) ───────────────────────
+  /// Sends the Google Play purchase token to the server, which is the ONLY
+  /// party allowed to set `is_premium` (the DB rejects client-side writes).
+  /// Returns the server's authoritative premium state. Entitlement is always
+  /// server-decided regardless of BYOK.
+  Future<bool> verifyPurchase({
+    required String purchaseToken,
+    required String productId,
+  }) async {
+    _requireSignIn();
+    final res = await http.post(
+      Uri.parse('$_functionsBaseUrl/verify-purchase'),
+      headers: _authHeaders,
+      body: jsonEncode({'purchaseToken': purchaseToken, 'productId': productId}),
+    ).timeout(const Duration(seconds: 30));
+
+    _checkSuccess(res);
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    return data['isPremium'] as bool? ?? false;
+  }
+
   // ── USDA enrichment ──────────────────────────────────────────────────────
   /// After an AI scan, look up each food item in USDA FoodData Central and
   /// recalculate nutrition using lab-verified per-100g data × estimated grams.

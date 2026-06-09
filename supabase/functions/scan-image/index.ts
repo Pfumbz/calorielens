@@ -43,30 +43,8 @@ serve(async (req) => {
     const isPremium = profile?.is_premium ?? false
     const isAnonymous = user.is_anonymous ?? false
 
-    // Check scan count WITHOUT incrementing (increment only after success)
     const today = new Date().toISOString().split('T')[0]
     const scanLimit = isPremium ? PRO_SCAN_LIMIT : isAnonymous ? GUEST_SCAN_LIMIT : FREE_SCAN_LIMIT
-
-    // Read current usage
-    const { data: usage } = await supabase
-      .from('usage')
-      .select('scan_count')
-      .eq('user_id', user.id)
-      .eq('date', today)
-      .maybeSingle()
-
-    const currentScans = usage?.scan_count ?? 0
-    if (currentScans >= scanLimit) {
-      const message = isPremium
-        ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
-        : isAnonymous
-          ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
-          : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
-      return new Response(
-        JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
 
     // Parse request body (supports optional second image and correction metadata)
     const body = await req.json()
@@ -108,9 +86,50 @@ serve(async (req) => {
     const hasSecondImage = !!(imageBase64_2 && mediaType_2)
     const isCorrection = !!correction_hint
 
+    // ── Rate limiting (H1 + H2 fix) ──────────────────────────────────────────
+    // Meter the scan ATOMICALLY and BEFORE calling the model. The previous code
+    // (a) checked the count, called Anthropic, then incremented — so N concurrent
+    // requests all passed the check and all incurred model cost (over-spend race),
+    // and (b) skipped metering entirely when `correction_hint` was present, which a
+    // client controls — giving unlimited free vision scans. Both are closed by
+    // metering every request up-front through the atomic check-and-increment RPC.
+    const { data: newCount, error: rpcError } = await supabase.rpc(
+      'increment_scan_if_allowed',
+      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+    )
+    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+    if (newCount === -1) {
+      const message = isPremium
+        ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
+        : isAnonymous
+          ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
+          : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
+      return new Response(
+        JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Best-effort refund of the metered scan if the model call fails, so users
+    // are not charged a quota slot for an error (important on poor networks).
+    const refundScan = async () => {
+      try {
+        await supabase
+          .from('usage')
+          .update({ scan_count: Math.max(0, (newCount as number) - 1) })
+          .eq('user_id', user.id)
+          .eq('date', today)
+      } catch (_) {
+        // ignore refund failure — metering integrity is preserved either way
+      }
+    }
+
     // Call Anthropic API (key stored securely in Supabase vault)
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not set in environment')
+    if (!anthropicKey) {
+      await refundScan()
+      throw new Error('ANTHROPIC_API_KEY not set in environment')
+    }
 
     const jsonFormat = `{"meal_name":"<descriptive name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<specific food>","portion":"<estimated size with unit>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief observation or uncertainty>"}],"overall_notes":"<2-3 sentences: nutritional highlights, balance assessment, any concerns>"}`
 
@@ -189,40 +208,39 @@ ${jsonFormat}`
     }
     contentArray.push({ type: 'text', text: prompt })
 
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: contentArray,
-        }],
-      }),
-    })
+    let anthropicData
+    try {
+      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2048, // headroom so large meals don't truncate the JSON
+          messages: [{
+            role: 'user',
+            content: contentArray,
+          }],
+        }),
+      })
 
-    if (!anthropicRes.ok) {
-      const err = await anthropicRes.json()
-      throw new Error(err.error?.message ?? `Anthropic error ${anthropicRes.status}`)
+      if (!anthropicRes.ok) {
+        const err = await anthropicRes.json()
+        throw new Error(err.error?.message ?? `Anthropic error ${anthropicRes.status}`)
+      }
+
+      anthropicData = await anthropicRes.json()
+    } catch (e) {
+      // Model call failed — refund the metered scan, then surface a generic error.
+      await refundScan()
+      throw e
     }
 
-    const anthropicData = await anthropicRes.json()
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
-
-    // Increment scan count AFTER successful AI response.
-    // Corrections with a photo retake don't consume a scan quota slot.
-    if (!isCorrection) {
-      await supabase.rpc(
-        'increment_scan_if_allowed',
-        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
-      )
-    }
 
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

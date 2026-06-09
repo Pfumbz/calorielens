@@ -44,28 +44,6 @@ serve(async (req) => {
     const body = await req.json()
     const { description, is_correction, original_context } = body
 
-    // Corrections (re-analysis after "Correct" button) are free — skip the counter
-    if (!is_correction) {
-      // Atomically check + increment scan count (prevents race conditions)
-      const { data: newCount, error: rpcError } = await supabase.rpc(
-        'increment_scan_if_allowed',
-        { p_user_id: user.id, p_date: today, p_limit: scanLimit }
-      )
-
-      if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
-
-      if (newCount === -1) {
-        const message = isPremium
-          ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
-          : isAnonymous
-            ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
-            : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
-        return new Response(
-          JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-    }
     if (!description) {
       return new Response(JSON.stringify({ error: 'Missing description' }), {
         status: 400,
@@ -73,8 +51,47 @@ serve(async (req) => {
       })
     }
 
+    // ── Rate limiting (H1 fix) ───────────────────────────────────────────────
+    // Meter EVERY request, including corrections. `is_correction` is a
+    // client-supplied flag; the previous code skipped metering whenever it was
+    // set, so a client could send is_correction:true on every request for
+    // unlimited free text scans. Metering is atomic (check-and-increment RPC).
+    const { data: newCount, error: rpcError } = await supabase.rpc(
+      'increment_scan_if_allowed',
+      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+    )
+    if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
+    if (newCount === -1) {
+      const message = isPremium
+        ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
+        : isAnonymous
+          ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
+          : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
+      return new Response(
+        JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Best-effort refund if the model call fails so users aren't charged a quota
+    // slot for an error (important on poor networks).
+    const refundScan = async () => {
+      try {
+        await supabase
+          .from('usage')
+          .update({ scan_count: Math.max(0, (newCount as number) - 1) })
+          .eq('user_id', user.id)
+          .eq('date', today)
+      } catch (_) {
+        // ignore refund failure
+      }
+    }
+
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not set in environment')
+    if (!anthropicKey) {
+      await refundScan()
+      throw new Error('ANTHROPIC_API_KEY not set in environment')
+    }
 
     let prompt: string
 
@@ -114,30 +131,36 @@ Respond ONLY in this exact JSON (no markdown):
 {"meal_name":"<short name>","total_calories":<int>,"protein_g":<int>,"carbs_g":<int>,"fat_g":<int>,"fiber_g":<int>,"items":[{"name":"<food>","portion":"<size>","calories":<int>,"weight_g":<number>,"usda_query":"<generic USDA search term>","note":"<brief>"}],"overall_notes":"<2-3 sentences>"}`
     }
 
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
+    let anthropicData
+    try {
+      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 2048, // headroom so large meals don't truncate the JSON
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      })
 
-    if (!anthropicRes.ok) {
-      const err = await anthropicRes.json()
-      throw new Error(err.error?.message ?? `Anthropic error ${anthropicRes.status}`)
+      if (!anthropicRes.ok) {
+        const err = await anthropicRes.json()
+        throw new Error(err.error?.message ?? `Anthropic error ${anthropicRes.status}`)
+      }
+
+      anthropicData = await anthropicRes.json()
+    } catch (e) {
+      await refundScan()
+      throw e
     }
 
-    const anthropicData = await anthropicRes.json()
     const raw = anthropicData.content.map((b: { text?: string }) => b.text ?? '').join('')
     const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim()
 
-    // Usage already incremented atomically above — just return the result
     return new Response(clean, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

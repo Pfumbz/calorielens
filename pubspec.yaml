@@ -1,7 +1,7 @@
 name: calorielens
 description: CalNova — AI-powered calorie scanner and nutrition coach
 publish_to: 'none'
-version: 1.4.1+12
+version: 1.5.0+13
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -16,6 +16,9 @@ dependencies:
 
   # Networking
   http: ^1.2.0
+
+  # App version / build number (forced-update gate)
+  package_info_plus: ^8.0.0
 
   # Camera & image picking
   image_picker: ^1.1.2

@@ -99,6 +99,23 @@ class SupabaseService {
     }
   }
 
+  // ── Remote app config ─────────────────────────────────────────────────────
+  /// Returns the minimum supported Android build number from `app_config`,
+  /// or null if unavailable (caller should fail open on null).
+  static Future<int?> fetchMinSupportedBuild() async {
+    try {
+      final data = await client
+          .from('app_config')
+          .select('value')
+          .eq('key', 'min_supported_build')
+          .maybeSingle();
+      final v = data?['value'] as String?;
+      return v == null ? null : int.tryParse(v);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Diary cloud sync ────────────────────────────────────────────────────
   /// Fetch today's diary entries from cloud for the current user.
   static Future<List<Map<String, dynamic>>> fetchTodayDiary() async {

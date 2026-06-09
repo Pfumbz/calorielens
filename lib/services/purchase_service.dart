@@ -69,6 +69,12 @@ class PurchaseService {
   /// Set by AppState during init.
   void Function(bool isPremium)? onPremiumChanged;
 
+  /// Server-side entitlement check. Set by AppState during init; posts the
+  /// purchase token to the verify-purchase Edge Function and returns the
+  /// server's authoritative premium state. Premium is NEVER granted on the
+  /// strength of a local purchase event alone.
+  Future<bool> Function(String purchaseToken, String productId)? verifyPurchase;
+
   // ── Initialisation ───────────────────────────────────────────────────────
 
   /// Initialise the purchase service. Call once at app start.
@@ -203,38 +209,47 @@ class PurchaseService {
     }
   }
 
-  /// Verify the purchase and deliver premium access.
+  /// Verify the purchase server-side and deliver premium access.
   ///
-  /// C-1: Added client-side token guard so a spoofed `purchased` event with an
-  /// empty verification token is rejected before premium is granted.
-  ///
-  /// IMPORTANT — TODO for server-side verification:
-  ///   1. Create a Supabase Edge Function (e.g. /functions/v1/verify-purchase)
-  ///   2. POST `purchase.verificationData.serverVerificationData` to it
-  ///   3. The function calls the Google Play Developer API:
-  ///      GET /purchases/subscriptions/{productId}/tokens/{purchaseToken}
-  ///   4. Only grant premium if the response shows a valid, not-expired subscription
-  ///   This prevents offline purchase spoofing entirely.
+  /// Entitlement is decided by the verify-purchase Edge Function (the only
+  /// party that can set `is_premium`). We acknowledge the purchase to Google
+  /// ONLY after the server has recorded the grant — if verification fails
+  /// (e.g. offline), the purchase is left pending and Play will re-deliver it
+  /// on a later launch so it can be retried, rather than silently acknowledging
+  /// a purchase the server never saw.
   Future<void> _verifyAndDeliver(iap.PurchaseDetails purchase, {bool isRestore = false}) async {
-    // Client-side guard: reject purchases with an empty verification token.
     // A legitimate Play Billing purchase always carries a non-empty token.
     final token = purchase.verificationData.serverVerificationData;
     if (token.isEmpty) {
       debugPrint('PurchaseService: Rejected purchase — empty verification token');
       _lastError = 'Purchase could not be verified. Please try again.';
       _stateController.add(ProPurchaseState.error);
-      if (purchase.pendingCompletePurchase) {
-        await _iapInstance.completePurchase(purchase);
-      }
+      return; // leave pending; do not acknowledge an unverifiable purchase
+    }
+
+    // Server-side verification is the source of truth.
+    bool granted = false;
+    try {
+      granted = await (verifyPurchase?.call(token, purchase.productID) ??
+          Future<bool>.value(false));
+    } catch (e) {
+      debugPrint('PurchaseService: Server verification failed: $e');
+      _lastError = 'Could not verify your purchase. Please check your connection and try restoring.';
+      _stateController.add(ProPurchaseState.error);
+      return; // transient — leave pending so Play re-delivers for retry
+    }
+
+    if (!granted) {
+      _lastError = 'Purchase could not be verified.';
+      _stateController.add(ProPurchaseState.error);
       return;
     }
 
     _isProActive = true;
     onPremiumChanged?.call(true);
-
     _stateController.add(isRestore ? ProPurchaseState.restored : ProPurchaseState.purchased);
 
-    // Complete the purchase (required by Google Play)
+    // Acknowledge to Google only AFTER the server granted entitlement.
     if (purchase.pendingCompletePurchase) {
       await _iapInstance.completePurchase(purchase);
     }

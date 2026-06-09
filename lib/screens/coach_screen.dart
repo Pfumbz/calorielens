@@ -433,11 +433,19 @@ class _CoachScreenState extends State<CoachScreen> {
         userMessage: text,
         systemPrompt: _buildSystemPrompt(state),
       );
+      if (!mounted) return; // user may have left during a slow request
       setState(() {
         _messages.add(ChatMessage(
-            role: 'assistant', content: reply, timestamp: DateTime.now()));
+          role: 'assistant',
+          // Guard against an empty response producing a blank bubble.
+          content: reply.trim().isEmpty
+              ? 'Sorry, I couldn\'t generate a reply. Please try again.'
+              : reply,
+          timestamp: DateTime.now(),
+        ));
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _messages.add(ChatMessage(
           role: 'assistant',
@@ -446,9 +454,11 @@ class _CoachScreenState extends State<CoachScreen> {
         ));
       });
     } finally {
-      setState(() => _loading = false);
-      _syncChatFlag();
-      _scrollToBottom();
+      if (mounted) {
+        setState(() => _loading = false);
+        _syncChatFlag();
+        _scrollToBottom();
+      }
     }
   }
 

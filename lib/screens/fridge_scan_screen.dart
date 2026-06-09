@@ -86,6 +86,7 @@ class _FridgeScanScreenState extends State<FridgeScanScreen>
         _mediaType,
       );
       await state.trackScan();
+      if (!mounted) return; // fridge scan is a long AI call; guard disposal
 
       // Match ingredients against curated plans
       final suggestions = _matchPlans(ingredients);
@@ -96,6 +97,7 @@ class _FridgeScanScreenState extends State<FridgeScanScreen>
       });
       _resultAnim.forward(from: 0);
     } catch (e) {
+      if (!mounted) return;
       setState(
           () => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
