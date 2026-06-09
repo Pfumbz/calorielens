@@ -9,6 +9,11 @@ const corsHeaders = {
 const GUEST_SCAN_LIMIT = 3 // scans per day for anonymous guests
 const FREE_SCAN_LIMIT = 5  // scans per day for free users
 const PRO_SCAN_LIMIT = 50  // scans per day for Pro users
+// Corrections (re-analyses) have their own, more generous daily allowance so
+// fixing an AI mistake never consumes the user's scan quota.
+const GUEST_CORRECTION_LIMIT = 5
+const FREE_CORRECTION_LIMIT = 10
+const PRO_CORRECTION_LIMIT = 100
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -51,35 +56,43 @@ serve(async (req) => {
       })
     }
 
-    // ── Rate limiting (H1 fix) ───────────────────────────────────────────────
-    // Meter EVERY request, including corrections. `is_correction` is a
-    // client-supplied flag; the previous code skipped metering whenever it was
-    // set, so a client could send is_correction:true on every request for
-    // unlimited free text scans. Metering is atomic (check-and-increment RPC).
+    // ── Rate limiting ─────────────────────────────────────────────────────────
+    // Scans and corrections (re-analyses) have SEPARATE daily allowances. A
+    // correction must not consume the user's scan quota, but is still capped so
+    // the client-supplied is_correction flag can't grant unlimited free AI.
+    const isCorrection = !!is_correction
+    const meterRpc = isCorrection ? 'increment_correction_if_allowed' : 'increment_scan_if_allowed'
+    const meterColumn = isCorrection ? 'correction_count' : 'scan_count'
+    const meterLimit = isCorrection
+      ? (isPremium ? PRO_CORRECTION_LIMIT : isAnonymous ? GUEST_CORRECTION_LIMIT : FREE_CORRECTION_LIMIT)
+      : scanLimit
+
     const { data: newCount, error: rpcError } = await supabase.rpc(
-      'increment_scan_if_allowed',
-      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+      meterRpc,
+      { p_user_id: user.id, p_date: today, p_limit: meterLimit }
     )
     if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
     if (newCount === -1) {
-      const message = isPremium
-        ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
-        : isAnonymous
-          ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
-          : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
+      const message = isCorrection
+        ? `You've reached today's limit for re-analysing meals. Your daily scans are unaffected.`
+        : isPremium
+          ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
+          : isAnonymous
+            ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
+            : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
       return new Response(
-        JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
+        JSON.stringify({ error: message, code: isCorrection ? 'CORRECTION_LIMIT_REACHED' : 'SCAN_LIMIT_REACHED' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Best-effort refund if the model call fails so users aren't charged a quota
-    // slot for an error (important on poor networks).
+    // Best-effort refund if the model call fails so users aren't charged a slot
+    // for an error (important on poor networks).
     const refundScan = async () => {
       try {
         await supabase
           .from('usage')
-          .update({ scan_count: Math.max(0, (newCount as number) - 1) })
+          .update({ [meterColumn]: Math.max(0, (newCount as number) - 1) })
           .eq('user_id', user.id)
           .eq('date', today)
       } catch (_) {

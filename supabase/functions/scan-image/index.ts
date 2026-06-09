@@ -9,6 +9,11 @@ const corsHeaders = {
 const GUEST_SCAN_LIMIT = 3 // scans per day for anonymous guests
 const FREE_SCAN_LIMIT = 5  // scans per day for free users
 const PRO_SCAN_LIMIT = 50  // scans per day for Pro users
+// Corrections (re-analyses) have their own, more generous daily allowance so
+// fixing an AI mistake never consumes the user's scan quota.
+const GUEST_CORRECTION_LIMIT = 5
+const FREE_CORRECTION_LIMIT = 10
+const PRO_CORRECTION_LIMIT = 100
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024  // 10 MB cap for image payloads
 
 serve(async (req) => {
@@ -86,37 +91,43 @@ serve(async (req) => {
     const hasSecondImage = !!(imageBase64_2 && mediaType_2)
     const isCorrection = !!correction_hint
 
-    // ── Rate limiting (H1 + H2 fix) ──────────────────────────────────────────
-    // Meter the scan ATOMICALLY and BEFORE calling the model. The previous code
-    // (a) checked the count, called Anthropic, then incremented — so N concurrent
-    // requests all passed the check and all incurred model cost (over-spend race),
-    // and (b) skipped metering entirely when `correction_hint` was present, which a
-    // client controls — giving unlimited free vision scans. Both are closed by
-    // metering every request up-front through the atomic check-and-increment RPC.
+    // ── Rate limiting ─────────────────────────────────────────────────────────
+    // Scans and corrections (re-analyses) have SEPARATE daily allowances, metered
+    // atomically BEFORE the model call. This keeps the H1/H2 fixes (no concurrency
+    // over-spend; client-controlled correction_hint can't grant unlimited free AI)
+    // while ensuring a correction never consumes the user's scan quota.
+    const meterRpc = isCorrection ? 'increment_correction_if_allowed' : 'increment_scan_if_allowed'
+    const meterColumn = isCorrection ? 'correction_count' : 'scan_count'
+    const meterLimit = isCorrection
+      ? (isPremium ? PRO_CORRECTION_LIMIT : isAnonymous ? GUEST_CORRECTION_LIMIT : FREE_CORRECTION_LIMIT)
+      : scanLimit
+
     const { data: newCount, error: rpcError } = await supabase.rpc(
-      'increment_scan_if_allowed',
-      { p_user_id: user.id, p_date: today, p_limit: scanLimit }
+      meterRpc,
+      { p_user_id: user.id, p_date: today, p_limit: meterLimit }
     )
     if (rpcError) throw new Error(`Usage check failed: ${rpcError.message}`)
     if (newCount === -1) {
-      const message = isPremium
-        ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
-        : isAnonymous
-          ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
-          : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
+      const message = isCorrection
+        ? `You've reached today's limit for re-analysing meals. Your daily scans are unaffected.`
+        : isPremium
+          ? `You've reached your daily limit of ${PRO_SCAN_LIMIT} scans. Limit resets at midnight.`
+          : isAnonymous
+            ? `You've used all ${GUEST_SCAN_LIMIT} free guest scans for today. Sign up for more scans!`
+            : `You've used all ${FREE_SCAN_LIMIT} free scans for today. Upgrade to Pro for up to ${PRO_SCAN_LIMIT} scans/day.`
       return new Response(
-        JSON.stringify({ error: message, code: 'SCAN_LIMIT_REACHED' }),
+        JSON.stringify({ error: message, code: isCorrection ? 'CORRECTION_LIMIT_REACHED' : 'SCAN_LIMIT_REACHED' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Best-effort refund of the metered scan if the model call fails, so users
-    // are not charged a quota slot for an error (important on poor networks).
+    // Best-effort refund of the metered slot if the model call fails, so users
+    // are not charged for an error (important on poor networks).
     const refundScan = async () => {
       try {
         await supabase
           .from('usage')
-          .update({ scan_count: Math.max(0, (newCount as number) - 1) })
+          .update({ [meterColumn]: Math.max(0, (newCount as number) - 1) })
           .eq('user_id', user.id)
           .eq('date', today)
       } catch (_) {
@@ -234,7 +245,7 @@ ${jsonFormat}`
 
       anthropicData = await anthropicRes.json()
     } catch (e) {
-      // Model call failed — refund the metered scan, then surface a generic error.
+      // Model call failed — refund the metered slot, then surface a generic error.
       await refundScan()
       throw e
     }
