@@ -2274,7 +2274,6 @@ class _EditSheetState extends State<_EditSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final maxListHeight = MediaQuery.of(context).size.height * 0.45;
     return Padding(
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -2297,11 +2296,10 @@ class _EditSheetState extends State<_EditSheet> {
           ),
           const SizedBox(height: 14),
 
-          // Item list — scrollable independently so footer buttons stay
-          // outside the scroll area and are never obscured by gesture
-          // competition between SingleChildScrollView and the buttons.
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxListHeight),
+          // Item list — Flexible so it shrinks to the space available above the
+          // keyboard (prevents the bottom overflow) and scrolls internally,
+          // while the footer buttons stay pinned below it.
+          Flexible(
             child: SingleChildScrollView(
               controller: _scrollController,
               child: Column(
