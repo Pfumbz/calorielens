@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart' as iap;
+// Android-specific types so we can pick the free-trial offer at checkout.
+// ignore: depend_on_referenced_packages
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 /// Google Play product ID for the CalNova Pro monthly subscription.
 /// Must match the product ID created in Google Play Console.
@@ -114,11 +117,35 @@ class PurchaseService {
         // in Google Play Console
       }
 
-      for (final product in response.productDetails) {
-        if (product.id == kProMonthlyId) {
-          _proProduct = product;
-          debugPrint('PurchaseService: Found product: ${product.title} — ${product.price}');
+      // A subscription with offers returns one ProductDetails per offer (e.g.
+      // the plain base plan AND the 7-day free-trial offer). Prefer the offer
+      // that includes a free-trial phase so eligible (new) users get the trial.
+      // Play only returns the trial offer to eligible users, so ineligible users
+      // fall back to the base plan automatically.
+      final matches =
+          response.productDetails.where((p) => p.id == kProMonthlyId).toList();
+      iap.ProductDetails? chosen;
+
+      for (final pd in matches) {
+        if (pd is GooglePlayProductDetails) {
+          final offers = pd.productDetails.subscriptionOfferDetails;
+          final idx = pd.subscriptionIndex ?? -1;
+          if (offers != null && idx >= 0 && idx < offers.length) {
+            final hasFreeTrial = offers[idx]
+                .pricingPhases
+                .any((ph) => ph.priceAmountMicros == 0);
+            if (hasFreeTrial) {
+              chosen = pd;
+              break;
+            }
+          }
         }
+      }
+
+      chosen ??= matches.isNotEmpty ? matches.first : null;
+      _proProduct = chosen;
+      if (chosen != null) {
+        debugPrint('PurchaseService: selected ${chosen.id} — ${chosen.price}');
       }
     } catch (e) {
       debugPrint('PurchaseService: Failed to load products: $e');

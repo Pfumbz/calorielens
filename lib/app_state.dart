@@ -8,6 +8,7 @@ import 'services/supabase_service.dart';
 import 'services/backend_service.dart';
 import 'services/purchase_service.dart';
 import 'services/health_service.dart';
+import 'services/review_service.dart';
 
 class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final _storage = StorageService();
@@ -78,6 +79,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   List<String> get savedPlanIds => _savedPlanIds;
   bool isPlanSaved(String planId) => _savedPlanIds.contains(planId);
+
+  /// Current consecutive-day logging streak (0 if lapsed).
+  int get currentStreak => _storage.currentStreak;
 
   int get totalCalories => _diary.fold(0, (s, e) => s + e.calories);
   int get totalProtein  => _diary.fold(0, (s, e) => s + e.protein);
@@ -216,6 +220,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     unawaited(NotificationService.scheduleNudges(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
+      streak: _storage.currentStreak,
     ));
 
     notifyListeners();
@@ -412,6 +417,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     await _storage.addDiaryEntry(entry);
     _diary = _storage.getDiary();
 
+    // Update the logging streak (retention loop).
+    await _storage.registerMealLoggedToday();
+
     // Sync to cloud if signed in
     if (isSignedIn) {
       final today = DateTime.now().toIso8601String().split('T')[0];
@@ -431,6 +439,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     unawaited(NotificationService.scheduleNudges(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
+      streak: _storage.currentStreak,
     ));
 
     notifyListeners();
@@ -479,6 +488,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     unawaited(NotificationService.scheduleNudges(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
+      streak: _storage.currentStreak,
     ));
     notifyListeners();
   }
@@ -500,6 +510,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     unawaited(NotificationService.scheduleNudges(
       caloriesEaten: totalCalories,
       calorieGoal: _calorieGoal,
+      streak: _storage.currentStreak,
     ));
     notifyListeners();
   }
@@ -550,6 +561,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       _backendScansToday = (_backendScansToday + 1).clamp(0, 999);
       unawaited(_storage.setCachedCloudScans(_backendScansToday));
     }
+    // Ask for a Play review after a positive moment (handled/rate-limited inside).
+    unawaited(ReviewService().maybeRequestAfterScan());
     notifyListeners();
   }
 

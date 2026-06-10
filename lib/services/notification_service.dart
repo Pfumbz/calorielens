@@ -344,6 +344,7 @@ class NotificationService {
   static Future<void> scheduleNudges({
     required int caloriesEaten,
     required int calorieGoal,
+    int streak = 0,
   }) async {
     if (!(await nudgesEnabled)) return;
 
@@ -397,8 +398,15 @@ class NotificationService {
       String body;
 
       if (caloriesEaten == 0) {
-        title = 'No meals logged today 📋';
-        body = 'It\'s evening and your diary is empty. Even a quick entry helps build the habit!';
+        if (streak >= 2) {
+          // Streak-protection hook — the strongest reason to come back today.
+          title = '🔥 Keep your $streak-day streak!';
+          body =
+              'You haven\'t logged today. Add a meal before midnight to keep your $streak-day streak alive.';
+        } else {
+          title = 'No meals logged today 📋';
+          body = 'It\'s evening and your diary is empty. Even a quick entry helps build the habit!';
+        }
       } else if (remaining > 300) {
         title = 'You\'re $remaining kcal under your goal 🎯';
         body = 'Have you had dinner? Log it to keep your tracking accurate.';

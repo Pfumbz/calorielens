@@ -15,6 +15,7 @@ import 'screens/today_screen.dart';
 import 'screens/coach_screen.dart';
 import 'screens/meal_plans_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
 
 void main() async {
@@ -457,6 +458,16 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     if (_updateRequired) return const ForceUpdateScreen();
+
+    // First-run onboarding (skippable). Also catches existing users who never
+    // completed a profile and are still on the generic default goal.
+    final state = context.watch<AppState>();
+    final p = state.profile;
+    final profileIncomplete = p.age <= 0 || p.weight <= 0 || p.height <= 0;
+    if (!StorageService().isOnboarded && profileIncomplete) {
+      return OnboardingScreen(onComplete: () => setState(() {}));
+    }
+
     return PopScope(
       // Always intercept back — statics like ScanScreen.isOnPhotoMode can
       // change without triggering an AppShell rebuild, so canPop must stay

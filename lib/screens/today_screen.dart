@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
+import '../services/notification_service.dart';
 import '../theme.dart';
 import '../services/health_service.dart';
 import '../widgets/ad_banner.dart';
@@ -47,6 +48,11 @@ class TodayScreen extends StatelessWidget {
               // Profile completion nudge
               if (_shouldShowProfileNudge(state))
                 const _ProfileNudgeCard(),
+              // One-time prompt to enable reminders (retention loop) for users
+              // who never went through onboarding with notifications on.
+              if (!StorageService().remindersOn &&
+                  !StorageService().remindersPromptDismissed)
+                _RemindersPromptCard(calorieGoal: state.calorieGoal),
               _buildMacroBars(state),
               const SizedBox(height: 12),
               _buildInsightsSection(context, state, isPro),
@@ -139,14 +145,47 @@ class TodayScreen extends StatelessWidget {
   Widget _buildTitle(AppState state) {
     final name = state.profile.name;
     final greeting = name.isNotEmpty ? 'Hey, $name 👋' : 'Today';
+    final streak = state.currentStreak;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(greeting,
-            style: const TextStyle(color: CLColors.text, fontSize: 22, fontWeight: FontWeight.w600)),
+        Expanded(
+          child: Text(greeting,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: CLColors.text, fontSize: 22, fontWeight: FontWeight.w600)),
+        ),
+        if (streak >= 1) ...[
+          _streakChip(streak),
+          const SizedBox(width: 10),
+        ],
         Text(_formatDate(DateTime.now()),
             style: const TextStyle(color: CLColors.muted, fontSize: 12)),
       ],
+    );
+  }
+
+  /// Compact "🔥 N" streak pill. Strong daily-return hook once it's above 1.
+  Widget _streakChip(int streak) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: CLColors.accentLo,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: CLColors.accent.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('🔥', style: TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
+          Text('$streak',
+              style: const TextStyle(
+                  color: CLColors.accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 
@@ -1349,6 +1388,143 @@ class _ProfileNudgeCardState extends State<_ProfileNudgeCard> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Reminders prompt — one-time nudge to enable the retention loop
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _RemindersPromptCard extends StatefulWidget {
+  final int calorieGoal;
+  const _RemindersPromptCard({required this.calorieGoal});
+
+  @override
+  State<_RemindersPromptCard> createState() => _RemindersPromptCardState();
+}
+
+class _RemindersPromptCardState extends State<_RemindersPromptCard> {
+  bool _dismissed = false;
+  bool _enabling = false;
+
+  Future<void> _enable() async {
+    setState(() => _enabling = true);
+    final eaten = context.read<AppState>().totalCalories;
+    try {
+      await NotificationService.requestPermission();
+      await NotificationService.setRemindersEnabled(true);
+      await NotificationService.setNudgesEnabled(
+        true,
+        caloriesEaten: eaten,
+        calorieGoal: widget.calorieGoal,
+      );
+    } catch (_) {
+      // ignore — never block the UI on a notification hiccup
+    }
+    if (mounted) setState(() => _dismissed = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: CLColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: CLColors.accent.withOpacity(0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: CLColors.accent.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.notifications_active_outlined,
+                      color: CLColors.accent.withOpacity(0.8), size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Never miss a day',
+                    style: TextStyle(
+                      color: CLColors.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    await StorageService().setRemindersPromptDismissed(true);
+                    if (mounted) setState(() => _dismissed = true);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(Icons.close,
+                        color: CLColors.muted.withOpacity(0.5), size: 16),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Turn on gentle meal reminders so you never forget to log — and keep your daily streak alive.',
+              style: TextStyle(color: CLColors.muted, fontSize: 12, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: _enabling ? null : _enable,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: CLColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: CLColors.accent.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_enabling)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: CLColors.accent),
+                        )
+                      else ...[
+                        const Icon(Icons.notifications_active,
+                            color: CLColors.accent, size: 16),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Turn on reminders',
+                          style: TextStyle(
+                            color: CLColors.accent,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

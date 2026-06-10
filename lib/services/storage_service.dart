@@ -212,6 +212,54 @@ class StorageService {
   bool get isOnboarded => _prefs.getBool('cl5_onboarded') ?? false;
   Future<void> setOnboarded() => _prefs.setBool('cl5_onboarded', true);
 
+  // ── Goal direction ('lose' | 'maintain' | 'gain') ─────────────────
+  // Stored locally (not in UserProfile/cloud) so the profile sheet can
+  // re-select it and recompute the calorie target consistently.
+  String get goalDirection => _prefs.getString('cl6_goal_dir') ?? 'maintain';
+  Future<void> setGoalDirection(String v) => _prefs.setString('cl6_goal_dir', v);
+
+  // ── In-app review tracking ─────────────────────────────────────────
+  /// Lifetime count of successful scans — drives the "positive moment" that
+  /// triggers the Play in-app review prompt.
+  int get totalSuccessfulScans => _prefs.getInt('cl6_total_scans') ?? 0;
+  Future<void> incrementTotalScans() =>
+      _prefs.setInt('cl6_total_scans', totalSuccessfulScans + 1);
+
+  /// Whether we've already asked for a review (so we never nag).
+  bool get reviewRequested => _prefs.getBool('cl6_review_requested') ?? false;
+  Future<void> setReviewRequested() =>
+      _prefs.setBool('cl6_review_requested', true);
+
+  // ── Logging streak ─────────────────────────────────────────────────
+  int get _streakValue => _prefs.getInt('cl6_streak') ?? 0;
+  int get longestStreak => _prefs.getInt('cl6_streak_best') ?? 0;
+  String get _streakDate => _prefs.getString('cl6_streak_date') ?? '';
+
+  /// The streak as it should be *displayed*: valid only if the last logged day
+  /// was today or yesterday, otherwise the streak has lapsed and reads 0.
+  int get currentStreak {
+    final last = _streakDate;
+    if (last.isEmpty) return 0;
+    final now = DateTime.now();
+    final today = _dateKey(now);
+    final yesterday = _dateKey(now.subtract(const Duration(days: 1)));
+    return (last == today || last == yesterday) ? _streakValue : 0;
+  }
+
+  /// Call when the user logs a meal. No-op if already counted today; increments
+  /// for a consecutive day; resets to 1 if a day was missed. Returns the streak.
+  Future<int> registerMealLoggedToday() async {
+    final now = DateTime.now();
+    final today = _dateKey(now);
+    if (_streakDate == today) return _streakValue; // already counted today
+    final yesterday = _dateKey(now.subtract(const Duration(days: 1)));
+    final streak = (_streakDate == yesterday) ? _streakValue + 1 : 1;
+    await _prefs.setInt('cl6_streak', streak);
+    await _prefs.setString('cl6_streak_date', today);
+    if (streak > longestStreak) await _prefs.setInt('cl6_streak_best', streak);
+    return streak;
+  }
+
   // ── Cloud migration flag ─────────────────────────────────────────
   bool get cloudMigrationDone => _prefs.getBool('cl5_cloud_migrated') ?? false;
   Future<void> setCloudMigrationDone() => _prefs.setBool('cl5_cloud_migrated', true);
@@ -265,6 +313,15 @@ class StorageService {
   /// Whether the user has dismissed the profile completion nudge.
   bool get profileNudgeDismissed => _prefs.getBool('cl6_profile_nudge_dismissed') ?? false;
   Future<void> setProfileNudgeDismissed(bool v) => _prefs.setBool('cl6_profile_nudge_dismissed', v);
+
+  /// Synchronous read of whether meal reminders are on (key owned by
+  /// NotificationService) — lets the Today screen decide whether to show the
+  /// "turn on reminders" prompt without an async call.
+  bool get remindersOn => _prefs.getBool('notif_reminders_on') ?? false;
+
+  /// Whether the user has dismissed the "turn on reminders" prompt.
+  bool get remindersPromptDismissed => _prefs.getBool('cl6_reminders_prompt_dismissed') ?? false;
+  Future<void> setRemindersPromptDismissed(bool v) => _prefs.setBool('cl6_reminders_prompt_dismissed', v);
 
   // ── AI-generated meal plans (JSON strings) ───────────────────────
   List<String> get generatedPlansJson {
