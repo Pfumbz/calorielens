@@ -471,10 +471,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text('Checking for previous purchases...'),
-                            backgroundColor: CLColors.surface,
+                            content: const Text('Checking for previous purchases…',
+                                style: TextStyle(color: CLColors.text)),
+                            backgroundColor: CLColors.surface2,
+                            duration: const Duration(seconds: 2),
                             behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            margin: const EdgeInsets.all(16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: CLColors.border),
+                            ),
                           ),
                         );
                       }

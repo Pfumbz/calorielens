@@ -223,7 +223,19 @@ class PurchaseService {
         break;
 
       case iap.PurchaseStatus.error:
-        _lastError = purchase.error?.message ?? 'Purchase failed. Please try again.';
+        final errMsg = purchase.error?.message ?? '';
+        // If the Play account already owns the subscription (e.g. bought under a
+        // different app login), don't show an error — restore it instead so the
+        // current account picks it up automatically.
+        if (errMsg.toLowerCase().contains('already')) {
+          if (purchase.pendingCompletePurchase) {
+            await _iapInstance.completePurchase(purchase);
+          }
+          _stateController.add(ProPurchaseState.loading);
+          await restorePurchases();
+          break;
+        }
+        _lastError = errMsg.isEmpty ? 'Purchase failed. Please try again.' : errMsg;
         _stateController.add(ProPurchaseState.error);
         if (purchase.pendingCompletePurchase) {
           await _iapInstance.completePurchase(purchase);

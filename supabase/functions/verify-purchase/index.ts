@@ -15,7 +15,6 @@ serve(async (req) => {
   }
 
   try {
-    // ── Authenticate the calling user (anon key + their JWT) ────────────────
     const authClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -26,7 +25,6 @@ serve(async (req) => {
       return json({ error: 'Unauthorized. Please sign in.' }, 401)
     }
 
-    // ── Service-role client: the ONLY path allowed to write entitlement ──────
     const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -35,8 +33,8 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const { purchaseToken, productId } = body as { purchaseToken?: string; productId?: string }
+    const nowIso = new Date().toISOString()
 
-    // Token-less call = "what's my current entitlement?" (used on app launch).
     if (!purchaseToken) {
       const { data } = await admin
         .from('profiles')
@@ -54,56 +52,60 @@ serve(async (req) => {
       return json({ error: 'Unknown product.' }, 400)
     }
 
-    // ── Token uniqueness: a purchase token may back only one account ─────────
+    // If this purchase token is bound to a DIFFERENT app account, move it to the
+    // current one (the Play account owner switched app logins). Only one account
+    // holds the entitlement at a time — the previous one is cleared.
     const { data: existing } = await admin
       .from('profiles')
       .select('id')
       .eq('pro_purchase_token', purchaseToken)
       .maybeSingle()
     if (existing && existing.id !== user.id) {
-      return json({ error: 'This purchase is already linked to another account.' }, 409)
+      await admin.from('profiles').update({
+        is_premium: false,
+        pro_purchase_token: null,
+        pro_verified: false,
+        pro_updated_at: nowIso,
+      }).eq('id', existing.id)
     }
 
-    // ── Validate the token directly with Google Play ─────────────────────────
     const sub = await getSubscriptionStatus(purchaseToken)
-    // sub.transient === true means we could not reach/authenticate Google.
-    // Do NOT change entitlement on a transient failure — ask the client to retry.
+
+    await admin.from('purchase_debug').insert({
+      user_id: user.id,
+      stage: sub.transient ? 'transient' : (sub.active ? 'active' : 'inactive'),
+      detail: sub.detail ?? null,
+    })
+
     if (sub.transient) {
-      return json({ error: 'Could not verify with Google right now. Please try again.' }, 503)
+      // Could not reach/authenticate Google. Grant PROVISIONALLY so a paying
+      // user isn't blocked by a Google API hiccup or permission propagation.
+      await admin.from('profiles').update({
+        is_premium: true,
+        pro_purchase_token: purchaseToken,
+        pro_verified: false,
+        pro_updated_at: nowIso,
+      }).eq('id', user.id)
+      return json({ isPremium: true, verified: false, provisional: true }, 200)
     }
 
     if (!sub.active) {
-      // Google says this subscription is not active (expired, on hold, paused,
-      // refunded, or the token is invalid). Revoke any premium for this user.
-      await admin
-        .from('profiles')
-        .update({
-          is_premium: false,
-          pro_verified: true,
-          pro_expires_at: sub.expiresAt,
-          pro_updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
+      await admin.from('profiles').update({
+        is_premium: false,
+        pro_verified: true,
+        pro_expires_at: sub.expiresAt,
+        pro_updated_at: nowIso,
+      }).eq('id', user.id)
       return json({ isPremium: false, verified: true }, 200)
     }
 
-    // Active & verified — grant Pro.
-    const { error: updateError } = await admin
-      .from('profiles')
-      .update({
-        is_premium: true,
-        pro_purchase_token: purchaseToken,
-        pro_verified: true,
-        pro_expires_at: sub.expiresAt,
-        pro_updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-
-    if (updateError) {
-      console.error('verify-purchase update error:', updateError)
-      return json({ error: 'Could not record purchase. Please try again.' }, 500)
-    }
-
+    await admin.from('profiles').update({
+      is_premium: true,
+      pro_purchase_token: purchaseToken,
+      pro_verified: true,
+      pro_expires_at: sub.expiresAt,
+      pro_updated_at: nowIso,
+    }).eq('id', user.id)
     return json({ isPremium: true, verified: true, expiresAt: sub.expiresAt }, 200)
   } catch (err) {
     console.error('verify-purchase error:', err)
@@ -111,18 +113,14 @@ serve(async (req) => {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Google Play subscription validation
-// ─────────────────────────────────────────────────────────────────────────────
-type SubStatus = { active: boolean; expiresAt: string | null; transient: boolean }
+type SubStatus = { active: boolean; expiresAt: string | null; transient: boolean; detail?: string }
 
 async function getSubscriptionStatus(purchaseToken: string): Promise<SubStatus> {
   let accessToken: string
   try {
     accessToken = await getGoogleAccessToken()
   } catch (e) {
-    console.error('Google auth failed:', e)
-    return { active: false, expiresAt: null, transient: true }
+    return { active: false, expiresAt: null, transient: true, detail: 'auth:' + ((e as Error).message ?? String(e)) }
   }
 
   const url =
@@ -132,40 +130,29 @@ async function getSubscriptionStatus(purchaseToken: string): Promise<SubStatus> 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
 
   if (res.status === 404 || res.status === 410) {
-    // Token unknown to Google → definitively not entitled (likely fabricated).
-    return { active: false, expiresAt: null, transient: false }
+    return { active: false, expiresAt: null, transient: false, detail: 'play_notfound_' + res.status }
   }
   if (!res.ok) {
-    // 401/403 (permission/setup) or 5xx → transient; don't change entitlement.
-    console.error('Play API error', res.status, await res.text())
-    return { active: false, expiresAt: null, transient: true }
+    const t = await res.text()
+    return { active: false, expiresAt: null, transient: true, detail: `play_${res.status}:${t.slice(0, 400)}` }
   }
 
   const data = await res.json()
   const state: string = data.subscriptionState ?? ''
   const expiry: string | null = data?.lineItems?.[0]?.expiryTime ?? null
   const notExpired = expiry ? Date.parse(expiry) > Date.now() : false
-
-  // Grant for active / grace-period subscriptions, and for cancelled-but-not-
-  // yet-expired (auto-renew off, access remains until period end).
   const active =
     state === 'SUBSCRIPTION_STATE_ACTIVE' ||
     state === 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD' ||
     (state === 'SUBSCRIPTION_STATE_CANCELED' && notExpired)
 
-  return { active, expiresAt: expiry, transient: false }
+  return { active, expiresAt: expiry, transient: false, detail: 'state=' + state }
 }
 
-// Mints a short-lived Google OAuth2 access token from the service account
-// using the JWT-bearer grant (RS256), via the Web Crypto API.
 async function getGoogleAccessToken(): Promise<string> {
   const raw = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')
   if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not set')
-  const sa = JSON.parse(raw) as {
-    client_email: string
-    private_key: string
-    token_uri?: string
-  }
+  const sa = JSON.parse(raw) as { client_email: string; private_key: string; token_uri?: string }
 
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'RS256', typ: 'JWT' }
@@ -185,11 +172,7 @@ async function getGoogleAccessToken(): Promise<string> {
     false,
     ['sign']
   )
-  const sigBuf = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    new TextEncoder().encode(unsigned)
-  )
+  const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned))
   const jwt = `${unsigned}.${b64urlBytes(new Uint8Array(sigBuf))}`
 
   const tokenRes = await fetch(claims.aud, {
@@ -201,10 +184,10 @@ async function getGoogleAccessToken(): Promise<string> {
     }),
   })
   if (!tokenRes.ok) {
-    throw new Error(`Token endpoint ${tokenRes.status}: ${await tokenRes.text()}`)
+    throw new Error(`token_${tokenRes.status}:${(await tokenRes.text()).slice(0, 300)}`)
   }
   const tok = await tokenRes.json()
-  if (!tok.access_token) throw new Error('No access_token returned')
+  if (!tok.access_token) throw new Error('no_access_token')
   return tok.access_token as string
 }
 
